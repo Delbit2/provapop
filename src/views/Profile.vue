@@ -20,9 +20,19 @@
                 <font-awesome-icon icon="user" class="profile__info-icon" />
                 <div class="profile__info-content">
                   <div class="profile__info-label">Apelido</div>
-                  <div class="profile__info-value">{{ form.nickname }}</div>
+                  <div class="profile__info-value">{{ form.nickname || 'Carregando...' }}</div>
                 </div>
               </div>
+            </div>
+
+            <div v-if="error" class="profile__message profile__message--error">
+              <font-awesome-icon icon="exclamation-circle" />
+              {{ error }}
+            </div>
+
+            <div v-if="success" class="profile__message profile__message--success">
+              <font-awesome-icon icon="check-circle" />
+              {{ success }}
             </div>
 
             <form @submit.prevent="handleSave" class="profile__form">
@@ -51,7 +61,8 @@
                     v-model="form.password"
                     :type="showPassword ? 'text' : 'password'"
                     class="profile__input"
-                    placeholder="Digite sua nova senha"
+                    placeholder="Digite sua nova senha (mínimo 6 caracteres)"
+                    :minlength="6"
                   />
                   <button
                     type="button"
@@ -61,7 +72,7 @@
                     <font-awesome-icon :icon="showPassword ? 'eye-slash' : 'eye'" />
                   </button>
                 </div>
-                <p class="profile__hint">Deixe em branco para manter a senha atual</p>
+                <p class="profile__hint">Deixe em branco para manter a senha atual (mínimo 6 caracteres)</p>
               </div>
 
               <div class="profile__actions">
@@ -91,17 +102,21 @@
 
           <Card variant="outlined" class="profile__stats">
             <h2 class="profile__stats-title">Estatísticas</h2>
-            <div class="profile__stats-grid">
+            <div v-if="loadingStats" class="profile__stats-loading">
+              <font-awesome-icon icon="circle-notch" class="profile__spinner" />
+              Carregando...
+            </div>
+            <div v-else class="profile__stats-grid">
               <div class="profile__stat-item">
-                <div class="profile__stat-value">0</div>
+                <div class="profile__stat-value">{{ stats.totalQuizzes }}</div>
                 <div class="profile__stat-label">Quizzes Completos</div>
               </div>
               <div class="profile__stat-item">
-                <div class="profile__stat-value">0%</div>
+                <div class="profile__stat-value">{{ stats.accuracy.toFixed(1) }}%</div>
                 <div class="profile__stat-label">Taxa de Acerto</div>
               </div>
               <div class="profile__stat-item">
-                <div class="profile__stat-value">#--</div>
+                <div class="profile__stat-value">{{ stats.position > 0 ? `#${stats.position}` : '--' }}</div>
                 <div class="profile__stat-label">Posição no Ranking</div>
               </div>
             </div>
@@ -113,46 +128,161 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import Card from '@/components/Card.vue'
 import Button from '@/components/Button.vue'
+import { useAuthStore } from '@/stores/auth'
+import { api } from '@/services/api'
+
+const authStore = useAuthStore()
 
 const form = ref({
-  nickname: 'Usuário',
-  email: 'usuario@exemplo.com',
+  nickname: '',
+  email: '',
   password: ''
 })
 
 const originalForm = ref({
-  email: 'usuario@exemplo.com',
+  email: '',
   password: ''
 })
 
+const stats = ref({
+  totalQuizzes: 0,
+  accuracy: 0,
+  position: 0
+})
+
 const loading = ref(false)
+const loadingStats = ref(false)
 const showPassword = ref(false)
+const error = ref<string | null>(null)
+const success = ref<string | null>(null)
 
 const hasChanges = computed(() => {
   return form.value.email !== originalForm.value.email ||
-         (form.value.password !== '' && form.value.password !== originalForm.value.password)
+         (form.value.password !== '' && form.value.password.length >= 6)
 })
 
-function handleSave() {
+async function loadUserData() {
   loading.value = true
+  error.value = null
   
-  setTimeout(() => {
-    originalForm.value.email = form.value.email
-    if (form.value.password) {
-      originalForm.value.password = form.value.password
-      form.value.password = ''
+  try {
+    const userData = await api.auth.me()
+    if (userData.user) {
+      form.value.nickname = userData.user.nickname || ''
+      form.value.email = userData.user.email || ''
+      originalForm.value.email = userData.user.email || ''
+      
+      authStore.user = userData.user
     }
+    // Se não houver usuário na resposta, o api.ts já tratou o erro 401/403
+    // Não precisamos fazer nada aqui, o callback de logout já foi chamado
+  } catch (err: any) {
+    // Se for erro 401/403, o authStore já foi atualizado pelo api.ts
+    // Não mostrar mensagem de erro de autenticação, apenas outros erros
+    if (!err.message?.includes('Sessão expirada') && 
+        !err.message?.includes('Acesso negado') &&
+        !err.message?.includes('Erro de conexão')) {
+      error.value = err.message || 'Erro ao carregar dados do usuário'
+    }
+  } finally {
     loading.value = false
-  }, 1500)
+  }
+}
+
+async function loadStats() {
+  loadingStats.value = true
+  
+  try {
+    const statsData = await api.users.getStats()
+    stats.value.totalQuizzes = statsData.total_quizzes || 0
+    stats.value.accuracy = statsData.accuracy || 0
+    
+    try {
+      const rankingData = await api.ranking.get()
+      if (rankingData && Array.isArray(rankingData)) {
+        const userPosition = rankingData.findIndex((r: any) => r.user_id === authStore.user?.id)
+        stats.value.position = userPosition >= 0 ? userPosition + 1 : 0
+      }
+    } catch (rankingErr: any) {
+      // Ranking não requer autenticação, então apenas logar o erro
+      console.error('Erro ao carregar ranking:', rankingErr)
+      stats.value.position = 0
+    }
+  } catch (err: any) {
+    // Se for erro 401/403, o authStore já foi atualizado pelo api.ts
+    // Apenas resetar stats
+    console.error('Erro ao carregar estatísticas:', err)
+    stats.value.totalQuizzes = 0
+    stats.value.accuracy = 0
+    stats.value.position = 0
+  } finally {
+    loadingStats.value = false
+  }
+}
+
+async function handleSave() {
+  loading.value = true
+  error.value = null
+  success.value = null
+  
+  try {
+    const updateData: { email?: string; password?: string } = {}
+    
+    if (form.value.email !== originalForm.value.email) {
+      updateData.email = form.value.email
+    }
+    
+    if (form.value.password && form.value.password.length >= 6) {
+      updateData.password = form.value.password
+    }
+    
+    if (Object.keys(updateData).length === 0) {
+      error.value = 'Nenhuma alteração para salvar'
+      loading.value = false
+      return
+    }
+    
+    const response = await api.users.updateProfile(updateData)
+    
+    if (response.user) {
+      originalForm.value.email = response.user.email || form.value.email
+      form.value.email = response.user.email || form.value.email
+      form.value.password = ''
+      
+      authStore.user = response.user
+      success.value = 'Perfil atualizado com sucesso!'
+      
+      setTimeout(() => {
+        success.value = null
+      }, 3000)
+    }
+  } catch (err: any) {
+    error.value = err.message || 'Erro ao atualizar perfil'
+  } finally {
+    loading.value = false
+  }
 }
 
 function handleCancel() {
   form.value.email = originalForm.value.email
   form.value.password = ''
+  error.value = null
+  success.value = null
 }
+
+onMounted(async () => {
+  if (authStore.user) {
+    form.value.nickname = authStore.user.nickname || ''
+    form.value.email = authStore.user.email || ''
+    originalForm.value.email = authStore.user.email || ''
+  }
+  
+  await loadUserData()
+  await loadStats()
+})
 </script>
 
 <style scoped>
@@ -341,6 +471,39 @@ function handleCancel() {
   color: var(--gray-dark);
   margin: 0;
   padding-left: 22px;
+}
+
+.profile__message {
+  padding: 12px 16px;
+  border-radius: var(--border-radius-md);
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.profile__message--error {
+  background: #fee;
+  color: #c33;
+  border: 2px solid #fcc;
+}
+
+.profile__message--success {
+  background: #efe;
+  color: #3c3;
+  border: 2px solid #cfc;
+}
+
+.profile__stats-loading {
+  text-align: center;
+  padding: 20px;
+  color: var(--gray-dark);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
 }
 
 .profile__actions {

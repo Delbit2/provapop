@@ -180,7 +180,7 @@ async function handleRegister() {
 }
 
 function goToLogin() {
-  router.push('/login')
+  router.push('/entrar')
 }
 </script>
 

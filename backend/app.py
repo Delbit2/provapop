@@ -3,15 +3,32 @@ from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from datetime import datetime, timedelta
+import os
 from config import Config
-from auth import login_required, optional_auth, get_current_user
 
 app = Flask(__name__)
-CORS(app, supports_credentials=True, origins=['http://localhost:5173', 'http://localhost:5174', 'http://localhost:3000'])
 app.config.from_object(Config)
+
+allowed_origins = os.getenv('CORS_ORIGINS', 'http://localhost:5173,http://localhost:5174,http://localhost:3000').split(',')
+
+CORS(
+    app,
+    supports_credentials=True,
+    origins=allowed_origins,
+    methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allow_headers=['Content-Type', 'Authorization', 'X-Requested-With'],
+    expose_headers=['Content-Type', 'Authorization'],
+    max_age=3600
+)
 
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
+
+def _import_auth():
+    from auth import login_required, optional_auth, get_current_user as _get_current_user
+    return login_required, optional_auth, _get_current_user
+
+login_required, optional_auth, _get_current_user = _import_auth()
 
 class User(db.Model):
     __tablename__ = 'users'
@@ -82,6 +99,11 @@ class QuizAttempt(db.Model):
     answered_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     question = db.relationship('Question', backref='attempts')
+
+def get_current_user():
+    # Passar db e User explicitamente
+    # Mas get_current_user também pode obtê-los automaticamente se necessário
+    return _get_current_user(db, User)
 
 @app.route('/api/health', methods=['GET'])
 def health_check():
@@ -179,7 +201,8 @@ def register_user():
         max_age=3600 * 24,
         httponly=True,
         samesite='Lax',
-        secure=False
+        secure=False,
+        path='/'
     )
     
     return response, 201
@@ -189,9 +212,13 @@ def login_user():
     data = request.get_json()
     
     if not data.get('email') or not data.get('password'):
-        return jsonify({'error': 'email and password are required'}), 400
+        return jsonify({'error': 'email/username and password are required'}), 400
     
-    user = User.query.filter_by(email=data['email']).first()
+    # Tentar encontrar usuário por email ou nickname
+    email_or_username = data['email'].strip()
+    user = User.query.filter(
+        (User.email == email_or_username) | (User.nickname == email_or_username)
+    ).first()
     
     if not user:
         return jsonify({'error': 'Invalid credentials'}), 401
@@ -213,7 +240,8 @@ def login_user():
         max_age=3600 * 24,
         httponly=True,
         samesite='Lax',
-        secure=False
+        secure=False,
+        path='/'
     )
     
     return response, 200
@@ -233,10 +261,11 @@ def get_current_user_info():
 
 @app.route('/api/auth/verify', methods=['GET'])
 def verify_auth():
+    # Sempre passar db e User explicitamente
     user = get_current_user()
     if user:
         return jsonify({'authenticated': True, 'user': user.to_dict()}), 200
-    return jsonify({'authenticated': False}), 401
+    return jsonify({'authenticated': False}), 200
 
 @app.route('/api/users/me/stats', methods=['GET'])
 @login_required

@@ -104,7 +104,7 @@ async function handleLogin() {
 }
 
 function goToRegister() {
-  router.push('/register')
+  router.push('/cadastro')
 }
 
 import { useRouter } from 'vue-router'

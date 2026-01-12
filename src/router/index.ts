@@ -10,13 +10,13 @@ const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
     {
-      path: '/login',
+      path: '/entrar',
       name: 'login',
       component: Login,
       meta: { requiresGuest: true }
     },
     {
-      path: '/register',
+      path: '/cadastro',
       name: 'register',
       component: Register,
       meta: { requiresGuest: true }
@@ -34,7 +34,7 @@ const router = createRouter({
       meta: { requiresAuth: true }
     },
     {
-      path: '/profile',
+      path: '/perfil',
       name: 'profile',
       component: Profile,
       meta: { requiresAuth: true }
@@ -46,18 +46,36 @@ router.beforeEach(async (to, from, next) => {
   const authStore = useAuthStore()
   
   if (to.meta.requiresAuth) {
-    if (!authStore.isAuthenticated) {
-      const authenticated = await authStore.verifyAuth()
-      if (!authenticated) {
-        return next('/login')
-      }
+    // Se já está autenticado localmente, permitir acesso imediatamente
+    // A verificação real será feita nas requisições autenticadas
+    if (authStore.isAuthenticated) {
+      return next()
     }
+    
+    // Se não parece autenticado, verificar com backend
+    // Mas apenas se não estiver vindo de uma rota pública (evita verificação desnecessária)
+    const authenticated = await authStore.verifyAuth()
+    if (!authenticated) {
+      // Se não estiver autenticado, redirecionar para login
+      return next('/entrar')
+    }
+    
+    // Se autenticado após verificação, permitir acesso
+    return next()
   }
   
-  if (to.meta.requiresGuest && authStore.isAuthenticated) {
-    return next('/')
+  if (to.meta.requiresGuest) {
+    // Para rotas de guest, apenas verificar estado local
+    // Não fazer verificação com backend para evitar delays
+    if (authStore.isAuthenticated) {
+      // Se parece autenticado, redirecionar para home
+      return next('/')
+    }
+    // Se não está autenticado, permitir acesso à rota de guest
+    return next()
   }
   
+  // Para rotas sem meta, permitir acesso
   next()
 })
 

@@ -4,6 +4,13 @@ interface RequestOptions extends RequestInit {
   requiresAuth?: boolean
 }
 
+// Função para deslogar o usuário quando não autorizado
+let logoutCallback: (() => void) | null = null
+
+export function setLogoutCallback(callback: () => void) {
+  logoutCallback = callback
+}
+
 async function request<T>(
   endpoint: string,
   options: RequestOptions = {}
@@ -12,25 +19,52 @@ async function request<T>(
 
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
+    'Accept': 'application/json',
     ...fetchOptions.headers,
   }
 
-  if (requiresAuth) {
-    const token = localStorage.getItem('access_token')
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`
-    }
+  let response: Response
+  try {
+    response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      ...fetchOptions,
+      headers,
+      credentials: 'include',
+      mode: 'cors',
+    })
+  } catch (networkError) {
+    // Erro de rede - não deslogar, apenas lançar erro
+    throw new Error('Erro de conexão. Verifique sua internet e tente novamente.')
   }
 
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-    ...fetchOptions,
-    headers,
-    credentials: 'include',
-  })
-
+  // Se receber 401 (Unauthorized) ou 403 (Forbidden), deslogar o usuário
   if (!response.ok) {
     const error = await response.json().catch(() => ({ error: 'Unknown error' }))
-    throw new Error(error.error || `HTTP error! status: ${response.status}`)
+    const errorMessage = error.error || `HTTP error! status: ${response.status}`
+    
+    // Rotas públicas que não devem deslogar mesmo com 401/403
+    const publicRoutes = ['/auth/login', '/auth/register', '/auth/verify']
+    const isPublicRoute = publicRoutes.some(route => endpoint.includes(route))
+    
+    // Apenas deslogar em caso de 401/403 real e em rotas que requerem autenticação
+    if ((response.status === 401 || response.status === 403) && !isPublicRoute && requiresAuth) {
+      // Deslogar automaticamente quando não autorizado em rotas protegidas
+      if (logoutCallback) {
+        logoutCallback()
+      }
+      // Para erros de autenticação, usar mensagem mais específica
+      if (response.status === 401) {
+        throw new Error('Sessão expirada. Por favor, faça login novamente.')
+      } else if (response.status === 403) {
+        throw new Error('Acesso negado. Você não tem permissão para esta ação.')
+      }
+    }
+    
+    // Para rotas públicas com 401, apenas lançar erro sem deslogar
+    if (response.status === 401 && isPublicRoute) {
+      throw new Error(errorMessage || 'Credenciais inválidas')
+    }
+    
+    throw new Error(errorMessage)
   }
 
   return response.json()

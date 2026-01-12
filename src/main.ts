@@ -20,6 +20,11 @@ app.use(router)
 app.component('font-awesome-icon', FontAwesomeIcon)
 
 const authStore = useAuthStore()
-authStore.verifyAuth().then(() => {
+// Verificar autenticação na inicialização, mas não bloquear o mount
+// O router guard cuidará da autenticação nas rotas
+authStore.verifyAuth().catch(() => {
+  // Ignorar erros na verificação inicial
+  // O usuário será redirecionado pelo router guard se necessário
+}).finally(() => {
   app.mount('#app')
 })

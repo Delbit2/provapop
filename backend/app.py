@@ -165,6 +165,9 @@ def register_user():
     from auth import generate_token
     token = generate_token(user.id, app.config['SECRET_KEY'], expires_in=3600 * 24)
     
+    from google_sheets import sync_user_to_sheets
+    sync_user_to_sheets(user.id)
+    
     response = make_response(jsonify({
         'message': 'User created successfully',
         'user': user.to_dict()
@@ -274,6 +277,9 @@ def save_attempt():
     db.session.add(attempt)
     db.session.commit()
     
+    from google_sheets import sync_user_to_sheets
+    sync_user_to_sheets(user.id)
+    
     return jsonify({
         'message': 'Attempt saved',
         'is_correct': is_correct,
@@ -297,6 +303,9 @@ def update_profile():
         user.password_hash = generate_password_hash(data['password'])
     
     db.session.commit()
+    
+    from google_sheets import sync_user_to_sheets
+    sync_user_to_sheets(user.id)
     
     return jsonify({'message': 'Profile updated', 'user': user.to_dict(include_email=True)}), 200
 
@@ -325,6 +334,55 @@ def get_ranking():
         entry['position'] = i
     
     return jsonify(ranking), 200
+
+@app.route('/api/sheets/sync-user', methods=['POST'])
+@login_required
+def sync_user_to_sheets_endpoint():
+    user = request.current_user
+    from google_sheets import sync_user_to_sheets
+    result = sync_user_to_sheets(user.id)
+    
+    if result['success']:
+        return jsonify(result), 200
+    return jsonify(result), 400
+
+@app.route('/api/sheets/sync-ranking', methods=['POST'])
+@login_required
+def sync_ranking_to_sheets_endpoint():
+    from google_sheets import sync_ranking_to_sheets
+    result = sync_ranking_to_sheets()
+    
+    if result['success']:
+        return jsonify(result), 200
+    return jsonify(result), 400
+
+@app.route('/api/sheets/test', methods=['GET'])
+@login_required
+def test_sheets_connection():
+    from google_sheets import extract_sheet_id, get_client
+    from flask import jsonify
+    
+    sheets_url = app.config.get('GOOGLE_SHEETS_URL')
+    if not sheets_url:
+        return jsonify({'error': 'Google Sheets URL not configured'}), 400
+    
+    sheet_id = extract_sheet_id(sheets_url)
+    if not sheet_id:
+        return jsonify({'error': 'Invalid Google Sheets URL'}), 400
+    
+    try:
+        client = get_client()
+        sheet = client.open_by_key(sheet_id)
+        return jsonify({
+            'success': True,
+            'message': 'Connection successful',
+            'sheet_title': sheet.title,
+            'sheet_id': sheet_id
+        }), 200
+    except FileNotFoundError as e:
+        return jsonify({'error': str(e)}), 400
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400
 
 if __name__ == '__main__':
     with app.app_context():

@@ -9,3 +9,6 @@ class Config:
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     FLASK_ENV = os.getenv('FLASK_ENV', 'development')
     FLASK_DEBUG = os.getenv('FLASK_DEBUG', '1') == '1'
+    GOOGLE_SHEETS_URL = os.getenv('GOOGLE_SHEETS_URL', '')
+    GOOGLE_SHEETS_CREDENTIALS_FILE = os.getenv('GOOGLE_SHEETS_CREDENTIALS_FILE', 'credentials.json')
+    GOOGLE_SHEETS_WORKSHEET_NAME = os.getenv('GOOGLE_SHEETS_WORKSHEET_NAME', 'Ranking')

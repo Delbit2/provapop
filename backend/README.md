@@ -42,20 +42,35 @@ O servidor estará disponível em `http://localhost:5000`
 ### Health Check
 - `GET /api/health` - Verifica se a API está funcionando
 
+### Autenticação
+- `POST /api/auth/register` - Registra um novo usuário
+- `POST /api/auth/login` - Faz login
+- `POST /api/auth/logout` - Faz logout
+- `GET /api/auth/me` - Obtém informações do usuário autenticado
+- `GET /api/auth/verify` - Verifica se está autenticado
+
 ### Questões
 - `GET /api/questions` - Lista todas as questões
 - `GET /api/questions/<id>` - Obtém uma questão específica (sem resposta correta)
 - `GET /api/questions/random` - Obtém uma questão aleatória
-- `POST /api/questions/<id>/check` - Verifica se a resposta está correta
+- `POST /api/questions/<id>/check` - Verifica se a resposta está correta (requer autenticação)
 
 ### Usuários
-- `POST /api/users/register` - Registra um novo usuário
-- `POST /api/users/login` - Faz login
-- `GET /api/users/<id>/stats` - Obtém estatísticas do usuário
-- `POST /api/users/<id>/attempts` - Salva uma tentativa de resposta
+- `GET /api/users/me/stats` - Obtém estatísticas do usuário autenticado
+- `POST /api/users/me/attempts` - Salva uma tentativa de resposta
+- `PUT /api/users/me/profile` - Atualiza perfil do usuário
 
 ### Ranking
 - `GET /api/ranking` - Obtém o ranking de usuários
+
+### Google Sheets
+- `POST /api/sheets/sync-user` - Sincroniza dados do usuário atual com Google Sheets
+- `POST /api/sheets/sync-ranking` - Sincroniza todo o ranking com Google Sheets
+- `GET /api/sheets/test` - Testa a conexão com Google Sheets
+
+## Integração com Google Sheets
+
+O sistema está configurado para sincronizar automaticamente dados com Google Sheets. Veja o arquivo `GOOGLE_SHEETS_SETUP.md` para instruções detalhadas de configuração.
 
 ## Estrutura do Banco de Dados
 

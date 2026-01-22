@@ -6,9 +6,14 @@
           <h1 class="home__title">Quiz Musical</h1>
           <p class="home__subtitle">Prepare-se para o ENEM com música</p>
         </div>
-        <button class="home__profile-btn" @click="goToProfile">
-          <font-awesome-icon icon="user" />
-        </button>
+        <div class="home__header-actions">
+          <button class="home__profile-btn" @click="goToProfile" title="Meu Perfil">
+            <font-awesome-icon icon="user" />
+          </button>
+          <button class="home__logout-btn" @click="handleLogout" title="Sair">
+            <font-awesome-icon icon="power-off" />
+          </button>
+        </div>
       </div>
 
       <div class="home__stats">
@@ -98,11 +103,13 @@
 import Button from '@/components/Button.vue'
 import Card from '@/components/Card.vue'
 import { useRouter } from 'vue-router'
+import { useAuthStore } from '@/stores/auth'
 
 const router = useRouter()
+const authStore = useAuthStore()
 
 function handleStart() {
-  router.push('/quiz')
+  router.push('/categorias')
 }
 
 function handleRanking() {
@@ -111,6 +118,14 @@ function handleRanking() {
 
 function goToProfile() {
   router.push('/perfil')
+}
+
+async function handleLogout() {
+  try {
+    await authStore.logout()
+  } catch (error) {
+    console.error('Erro ao fazer logout:', error)
+  }
 }
 </script>
 
@@ -138,6 +153,12 @@ function goToProfile() {
   flex: 1;
 }
 
+.home__header-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
 .home__title {
   font-size: 32px;
   font-weight: 700;
@@ -154,7 +175,8 @@ function goToProfile() {
   margin: 0;
 }
 
-.home__profile-btn {
+.home__profile-btn,
+.home__logout-btn {
   width: 44px;
   height: 44px;
   border-radius: 50%;
@@ -168,11 +190,25 @@ function goToProfile() {
   transition: all var(--transition-base);
   box-shadow: var(--shadow-sm);
   flex-shrink: 0;
+  font-size: 18px;
 }
 
-.home__profile-btn:active {
+.home__profile-btn:active,
+.home__logout-btn:active {
   transform: scale(0.95);
   background: var(--green-dark);
+}
+
+.home__logout-btn {
+  background: var(--yellow-primary);
+}
+
+.home__logout-btn:hover {
+  background: var(--yellow-dark);
+}
+
+.home__logout-btn:active {
+  background: var(--yellow-dark);
 }
 
 .home__stats {
@@ -352,13 +388,21 @@ function goToProfile() {
     font-size: 16px;
   }
 
-  .home__profile-btn {
+  .home__profile-btn,
+  .home__logout-btn {
     width: 52px;
     height: 52px;
+    font-size: 20px;
   }
 
   .home__profile-btn:hover {
     background: var(--green-dark);
+    transform: scale(1.05);
+    box-shadow: var(--shadow-md);
+  }
+
+  .home__logout-btn:hover {
+    background: var(--yellow-dark);
     transform: scale(1.05);
     box-shadow: var(--shadow-md);
   }

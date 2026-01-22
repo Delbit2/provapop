@@ -4,6 +4,7 @@ import Quiz from '@/views/Quiz.vue'
 import Login from '@/views/Login.vue'
 import Register from '@/views/Register.vue'
 import Profile from '@/views/Profile.vue'
+import CategoryMenu from '@/views/CategoryMenu.vue'
 import { useAuthStore } from '@/stores/auth'
 
 const router = createRouter({
@@ -28,10 +29,21 @@ const router = createRouter({
       meta: { requiresAuth: true }
     },
     {
-      path: '/quiz',
+      path: '/categorias',
+      name: 'categories',
+      component: CategoryMenu,
+      meta: { requiresAuth: true }
+    },
+    {
+      path: '/quiz/:category',
       name: 'quiz',
       component: Quiz,
-      meta: { requiresAuth: true }
+      meta: { requiresAuth: true },
+      props: true
+    },
+    {
+      path: '/quiz',
+      redirect: '/categorias'
     },
     {
       path: '/perfil',
@@ -65,12 +77,21 @@ router.beforeEach(async (to, from, next) => {
   }
   
   if (to.meta.requiresGuest) {
-    // Para rotas de guest, apenas verificar estado local
-    // Não fazer verificação com backend para evitar delays
+    // Para rotas de guest, verificar se está autenticado
+    // Se estiver autenticado, redirecionar para home
     if (authStore.isAuthenticated) {
-      // Se parece autenticado, redirecionar para home
+      // Se parece autenticado localmente, redirecionar imediatamente
       return next('/')
     }
+    
+    // Verificar com backend para garantir que não está autenticado
+    // Isso evita que usuários autenticados acessem login/register
+    const authenticated = await authStore.verifyAuth()
+    if (authenticated) {
+      // Se estiver autenticado, redirecionar para home
+      return next('/')
+    }
+    
     // Se não está autenticado, permitir acesso à rota de guest
     return next()
   }

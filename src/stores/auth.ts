@@ -42,6 +42,15 @@ export const useAuthStore = defineStore('auth', () => {
       const response = await api.auth.login(email, password)
       user.value = response.user
       lastVerification.value = Date.now()
+      
+      // Aguardar um pouco para dar tempo da sincronização no backend acontecer
+      // (a sincronização roda em background, então não bloqueia)
+      setTimeout(() => {
+        // Forçar recarregamento de questões após login
+        // Isso será feito automaticamente quando o usuário acessar o quiz
+        console.log('[AUTH] Login successful, questions will be synced automatically')
+      }, 1000)
+      
       await router.push('/')
       return response
     } catch (err: any) {

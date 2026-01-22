@@ -4,8 +4,13 @@
       <Transition name="fade" appear>
         <div class="profile__content">
           <div class="profile__header">
-            <h1 class="profile__title">Meu Perfil</h1>
-            <p class="profile__subtitle">Gerencie suas informações pessoais</p>
+            <button class="profile__back-btn" @click="goBack" title="Voltar">
+              <font-awesome-icon icon="arrow-left" />
+            </button>
+            <div class="profile__header-content">
+              <h1 class="profile__title">Meu Perfil</h1>
+              <p class="profile__subtitle">Gerencie suas informações pessoais</p>
+            </div>
           </div>
 
           <Card variant="elevated" class="profile__card">
@@ -129,11 +134,13 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import Card from '@/components/Card.vue'
 import Button from '@/components/Button.vue'
 import { useAuthStore } from '@/stores/auth'
 import { api } from '@/services/api'
 
+const router = useRouter()
 const authStore = useAuthStore()
 
 const form = ref({
@@ -273,6 +280,10 @@ function handleCancel() {
   success.value = null
 }
 
+function goBack() {
+  router.push('/')
+}
+
 onMounted(async () => {
   if (authStore.user) {
     form.value.nickname = authStore.user.nickname || ''
@@ -305,6 +316,45 @@ onMounted(async () => {
 }
 
 .profile__header {
+  text-align: center;
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.profile__back-btn {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--green-primary);
+  color: var(--white);
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all var(--transition-base);
+  box-shadow: var(--shadow-sm);
+  flex-shrink: 0;
+  font-size: 18px;
+  margin-top: 0;
+}
+
+.profile__back-btn:hover {
+  background: var(--green-dark);
+  transform: scale(1.05);
+  box-shadow: var(--shadow-md);
+}
+
+.profile__back-btn:active {
+  transform: scale(0.95);
+  background: var(--green-dark);
+}
+
+.profile__header-content {
+  flex: 1;
   text-align: center;
 }
 
@@ -662,6 +712,12 @@ onMounted(async () => {
   .profile__stats-title {
     font-size: 20px;
     margin-bottom: 20px;
+  }
+
+  .profile__back-btn {
+    width: 52px;
+    height: 52px;
+    font-size: 20px;
   }
 }
 

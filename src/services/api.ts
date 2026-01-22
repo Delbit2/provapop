@@ -106,11 +106,13 @@ export const api = {
   },
 
   questions: {
-    getAll: () =>
-      request<any[]>('/questions', {
+    getAll: (category?: string) => {
+      const url = category ? `/questions?category=${encodeURIComponent(category)}` : '/questions'
+      return request<any[]>(url, {
         method: 'GET',
         requiresAuth: false,
-      }),
+      })
+    },
 
     getById: (id: number) =>
       request<any>(`/questions/${id}`, {

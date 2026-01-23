@@ -181,8 +181,8 @@
               </div>
             </div>
 
-            <!-- Comment Section -->
-            <div class="quiz__comment-section" v-if="currentQuestion.comment">
+            <!-- Comment Section (só aparece quando acertar) -->
+            <div class="quiz__comment-section" v-if="isCorrect && currentQuestion.comment">
               <div class="quiz__comment-header">
                 <font-awesome-icon icon="comment" class="quiz__comment-icon" />
                 <h3 class="quiz__comment-title">Comentário</h3>
@@ -353,6 +353,7 @@ const previousResult = ref<boolean | null>(null)
 const pointsEarned = ref(false)
 const pointsValue = ref(0)
 const viewMode = ref<'unanswered' | 'answered'>('unanswered') // Modo de visualização
+const displayedQuestion = ref<any>(null) // Questão que está sendo exibida (mantém referência mesmo após ser respondida)
 
 // Computed - Separar questões em respondidas e não respondidas
 const answeredQuestions = computed(() => {
@@ -369,12 +370,23 @@ const filteredQuestions = computed(() => {
 })
 
 // Computed - Questão atual baseada nas questões filtradas
+// Se há uma questão sendo exibida (displayedQuestion) após responder, usa ela para manter a questão na tela
 const currentQuestion = computed(() => {
+  // Se há uma questão sendo exibida (após responder), mantém ela até o usuário avançar
+  if (displayedQuestion.value && answered.value) {
+    return displayedQuestion.value
+  }
+  // Caso contrário, usa a questão filtrada normalmente
   if (filteredQuestions.value.length === 0) return null
   if (currentQuestionIndex.value >= filteredQuestions.value.length) {
     currentQuestionIndex.value = 0
   }
-  return filteredQuestions.value[currentQuestionIndex.value]
+  const question = filteredQuestions.value[currentQuestionIndex.value]
+  // Atualizar displayedQuestion quando mudar de questão (antes de responder)
+  if (!answered.value && question) {
+    displayedQuestion.value = question
+  }
+  return question
 })
 
 // Computed - Contagem total de questões
@@ -460,11 +472,16 @@ function resetQuestionState() {
   previousResult.value = null
   pointsEarned.value = false
   pointsValue.value = 0
+  displayedQuestion.value = null // Limpar questão exibida ao resetar
   
   // Verificar se a questão atual já foi respondida
-  if (currentQuestion.value && typeof currentQuestion.value === 'object' && currentQuestion.value.already_answered) {
-    alreadyAnswered.value = true
-    previousResult.value = currentQuestion.value.previous_result ?? null
+  if (currentQuestion.value && typeof currentQuestion.value === 'object' && currentQuestion.value !== null) {
+    if (currentQuestion.value.already_answered) {
+      alreadyAnswered.value = true
+      previousResult.value = (currentQuestion.value.previous_result !== undefined && currentQuestion.value.previous_result !== null) 
+        ? currentQuestion.value.previous_result 
+        : null
+    }
   }
   
   if (audioElement.value) {
@@ -620,62 +637,46 @@ async function confirmAnswer() {
     pointsEarned.value = result.points_earned || false
     pointsValue.value = result.points || 0
     
-    // Atualizar estado da questão atual na lista completa
-    if (currentQuestion.value && typeof currentQuestion.value === 'object') {
-      // Garantir que as propriedades existem antes de definir
-      if (currentQuestion.value.already_answered === undefined) {
-        currentQuestion.value.already_answered = false
-      }
-      if (currentQuestion.value.previous_result === undefined) {
-        currentQuestion.value.previous_result = null
-      }
-      
-      currentQuestion.value.already_answered = true
-      currentQuestion.value.previous_result = previousResult.value
-      
-      // Encontrar a questão na lista completa e atualizar
-      const questionId = currentQuestion.value.id
-      if (questionId) {
-        const questionInAllList = allQuestions.value.find(q => q && q.id === questionId)
-        if (questionInAllList && typeof questionInAllList === 'object') {
-          if (questionInAllList.already_answered === undefined) {
-            questionInAllList.already_answered = false
+    // Manter referência à questão atual sendo exibida ANTES de atualizar already_answered
+    // Isso garante que mesmo que a questão seja movida para outra lista, ela continue sendo exibida
+    if (!displayedQuestion.value && currentQuestion.value) {
+      displayedQuestion.value = { ...currentQuestion.value }
+    }
+    
+    // Atualizar displayedQuestion com o estado atualizado
+    if (displayedQuestion.value) {
+      displayedQuestion.value.already_answered = true
+      displayedQuestion.value.previous_result = previousResult.value
+    }
+    
+    // Atualizar estado da questão na lista completa
+    const currentQ = displayedQuestion.value || currentQuestion.value
+    if (currentQ && typeof currentQ === 'object' && currentQ !== null) {
+      try {
+        // Encontrar a questão na lista completa e atualizar
+        const questionId = currentQ.id
+        if (questionId) {
+          const questionInAllList = allQuestions.value.find(q => q && q.id === questionId)
+          if (questionInAllList && typeof questionInAllList === 'object' && questionInAllList !== null) {
+            try {
+              if (!('already_answered' in questionInAllList)) {
+                questionInAllList.already_answered = false
+              }
+              if (!('previous_result' in questionInAllList)) {
+                questionInAllList.previous_result = null
+              }
+              questionInAllList.already_answered = true
+              questionInAllList.previous_result = previousResult.value
+            } catch (err) {
+              console.error('Erro ao atualizar questão na lista:', err)
+            }
           }
-          if (questionInAllList.previous_result === undefined) {
-            questionInAllList.previous_result = null
-          }
-          questionInAllList.already_answered = true
-          questionInAllList.previous_result = previousResult.value
         }
+      } catch (err) {
+        console.error('Erro ao atualizar estado da questão:', err)
       }
       
-      // Se estamos no modo "não respondidas" e a questão foi respondida agora,
-      // mover para a próxima questão não respondida após mostrar feedback
-      if (viewMode.value === 'unanswered') {
-        // Aguardar um pouco para o usuário ver o feedback antes de mover
-        setTimeout(() => {
-          // Verificar se ainda há questões não respondidas
-          if (unansweredQuestions.value.length > 0) {
-            // Se o índice atual não existe mais (questão foi movida), ir para a primeira disponível
-            if (currentQuestionIndex.value >= unansweredQuestions.value.length) {
-              currentQuestionIndex.value = 0
-            }
-            // Se a questão atual não é mais "não respondida", ir para a próxima disponível
-            const currentInList = filteredQuestions.value[currentQuestionIndex.value]
-            if (currentInList && currentInList.already_answered) {
-              currentQuestionIndex.value = Math.min(currentQuestionIndex.value, unansweredQuestions.value.length - 1)
-            }
-            resetQuestionState()
-          } else {
-            // Se não há mais questões não respondidas, mudar para o modo de respondidas
-            if (answeredQuestions.value.length > 0) {
-              viewMode.value = 'answered'
-              currentQuestionIndex.value = 0
-              resetQuestionState()
-            }
-          }
-        }, 2500)
-      }
+      // Não mover automaticamente - o usuário deve clicar em "Próxima Questão" manualmente
     }
     
     // Só mostrar confetti se acertou E ganhou pontos (primeira tentativa)

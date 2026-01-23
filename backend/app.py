@@ -387,26 +387,27 @@ def check_answer(question_id):
         user.update_score(points)
         
         points_earned = True
-    else:
-        # Já respondeu antes - não ganha nem perde pontos
-        # Mas ainda salva a tentativa para histórico
-        app.logger.info(f'User {user.id} attempting question {question_id} again (already answered before)')
-    
-    # Sempre salvar a tentativa (para histórico, mesmo se já respondeu)
-    attempt = QuizAttempt(
-        user_id=user.id,
-        question_id=question_id,
-        selected_answer=selected_answer.upper(),
-        is_correct=is_correct,
-        points=points  # Será 0 se já respondeu antes
-    )
-    
-    db.session.add(attempt)
-    db.session.commit()
-    
-    # Sincronizar com Google Sheets apenas se ganhou/perdeu pontos
-    if points_earned:
+        
+        # Salvar a tentativa apenas se for a primeira vez
+        attempt = QuizAttempt(
+            user_id=user.id,
+            question_id=question_id,
+            selected_answer=selected_answer.upper(),
+            is_correct=is_correct,
+            points=points
+        )
+        
+        db.session.add(attempt)
+        db.session.commit()
+        
+        # Sincronizar com Google Sheets apenas se ganhou/perdeu pontos
         sync_user_to_sheets_async(user.id)
+        
+        app.logger.info(f'[ATTEMPT] User {user.id} answered question {question_id} for the first time. Correct: {is_correct}, Points: {points}, Total Score: {user.total_score}')
+    else:
+        # Já respondeu antes - NÃO salvar tentativa, NÃO atualizar ranking, NÃO fazer nada
+        app.logger.info(f'[ATTEMPT] User {user.id} attempting question {question_id} again (already answered before) - NO changes to ranking/score')
+        # Não fazer commit, não salvar tentativa, não atualizar nada
     
     return jsonify({
         'is_correct': is_correct,

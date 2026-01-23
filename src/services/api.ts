@@ -127,7 +127,15 @@ export const api = {
       }),
 
     checkAnswer: (questionId: number, selectedAnswer: string) =>
-      request<{ is_correct: boolean; correct_answer: string }>(
+      request<{ 
+        is_correct: boolean
+        correct_answer: string
+        points: number
+        total_score: number
+        already_answered: boolean
+        points_earned: boolean
+        previous_result: boolean | null
+      }>(
         `/questions/${questionId}/check`,
         {
           method: 'POST',

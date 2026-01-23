@@ -12,7 +12,7 @@
         <div v-else-if="error" class="quiz__error">
           <font-awesome-icon icon="exclamation-triangle" class="quiz__error-icon" />
           <p>{{ error }}</p>
-          <Button variant="primary" @click="loadQuestions">Tentar Novamente</Button>
+          <Button variant="primary" @click="() => loadQuestions()">Tentar Novamente</Button>
         </div>
 
         <!-- No Questions State -->
@@ -598,7 +598,7 @@ function triggerConfetti() {
     colors: ['#2ecc71', '#27ae60', '#52e88f', '#f1c40f', '#f39c12', '#f7dc6f']
   })
 
-  const interval: NodeJS.Timeout = setInterval(function() {
+  const interval = setInterval(function() {
     const timeLeft = animationEnd - Date.now()
 
     if (timeLeft <= 0) {

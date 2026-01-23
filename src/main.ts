@@ -10,7 +10,7 @@ import { useAuthStore } from './stores/auth'
 import './styles/colors.css'
 import './styles/global.css'
 
-library.add(fas, fab)
+library.add(fas as any, fab as any)
 
 const app = createApp(App)
 const pinia = createPinia()

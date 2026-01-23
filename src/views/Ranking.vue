@@ -188,6 +188,7 @@ const filters = [
 
 const selectedFilter = ref<FilterType>('all')
 const rankingData = ref<Array<{
+  is_current_user?: boolean
   user_id: number
   nickname: string
   total_quizzes: number

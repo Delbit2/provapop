@@ -206,7 +206,6 @@ async function loadStats() {
     const statsData = await api.users.getStats()
     stats.value.totalQuizzes = statsData.total_quizzes || 0
     stats.value.accuracy = statsData.accuracy || 0
-    stats.value.totalScore = statsData.total_score || 0
     
     // Buscar posição no ranking
     try {

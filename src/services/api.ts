@@ -144,6 +144,8 @@ export const api = {
         total_quizzes: number
         correct_answers: number
         accuracy: number
+        total_score: number
+        total_points_calculated: number
       }>('/users/me/stats', {
         method: 'GET',
         requiresAuth: true,
@@ -158,8 +160,9 @@ export const api = {
   },
 
   ranking: {
-    get: () =>
-      request<
+    get: (period?: 'all' | 'week' | 'month') => {
+      const params = period && period !== 'all' ? `?period=${period}` : ''
+      return request<
         Array<{
           user_id: number
           nickname: string
@@ -167,10 +170,12 @@ export const api = {
           correct_answers: number
           accuracy: number
           position: number
+          total_score: number
         }>
-      >('/ranking', {
+      >(`/ranking${params}`, {
         method: 'GET',
         requiresAuth: false,
-      }),
+      })
+    },
   },
 }

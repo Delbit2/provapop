@@ -117,7 +117,7 @@
                 <div class="profile__stat-label">Quizzes Completos</div>
               </div>
               <div class="profile__stat-item">
-                <div class="profile__stat-value">{{ stats.accuracy.toFixed(1) }}%</div>
+                <div class="profile__stat-value">{{ stats.totalQuizzes > 0 ? stats.accuracy.toFixed(1) : '0.0' }}%</div>
                 <div class="profile__stat-label">Taxa de Acerto</div>
               </div>
               <div class="profile__stat-item">
@@ -206,12 +206,20 @@ async function loadStats() {
     const statsData = await api.users.getStats()
     stats.value.totalQuizzes = statsData.total_quizzes || 0
     stats.value.accuracy = statsData.accuracy || 0
+    stats.value.totalScore = statsData.total_score || 0
     
+    // Buscar posição no ranking
     try {
-      const rankingData = await api.ranking.get()
+      const rankingData = await api.ranking.get('all')
       if (rankingData && Array.isArray(rankingData)) {
-        const userPosition = rankingData.findIndex((r: any) => r.user_id === authStore.user?.id)
-        stats.value.position = userPosition >= 0 ? userPosition + 1 : 0
+        const currentUser = rankingData.find((r: any) => r.user_id === authStore.user?.id)
+        if (currentUser && currentUser.position) {
+          stats.value.position = currentUser.position
+        } else {
+          stats.value.position = 0
+        }
+      } else {
+        stats.value.position = 0
       }
     } catch (rankingErr: any) {
       // Ranking não requer autenticação, então apenas logar o erro

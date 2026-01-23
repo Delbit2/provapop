@@ -5,6 +5,7 @@ import Login from '@/views/Login.vue'
 import Register from '@/views/Register.vue'
 import Profile from '@/views/Profile.vue'
 import CategoryMenu from '@/views/CategoryMenu.vue'
+import Ranking from '@/views/Ranking.vue'
 import { useAuthStore } from '@/stores/auth'
 
 const router = createRouter({
@@ -49,6 +50,12 @@ const router = createRouter({
       path: '/perfil',
       name: 'profile',
       component: Profile,
+      meta: { requiresAuth: true }
+    },
+    {
+      path: '/ranking',
+      name: 'ranking',
+      component: Ranking,
       meta: { requiresAuth: true }
     }
   ]

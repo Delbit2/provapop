@@ -21,7 +21,7 @@
           <div class="home__stat-item">
             <font-awesome-icon icon="trophy" class="home__stat-icon" />
             <div class="home__stat-content">
-              <div class="home__stat-value">0</div>
+              <div class="home__stat-value">{{ stats.total_quizzes || 0 }}</div>
               <div class="home__stat-label">Quizzes</div>
             </div>
           </div>
@@ -30,7 +30,7 @@
           <div class="home__stat-item">
             <font-awesome-icon icon="check-circle" class="home__stat-icon" />
             <div class="home__stat-content">
-              <div class="home__stat-value">0%</div>
+              <div class="home__stat-value">{{ stats.accuracy ? `${Math.round(stats.accuracy)}%` : '0%' }}</div>
               <div class="home__stat-label">Acertos</div>
             </div>
           </div>
@@ -39,7 +39,7 @@
           <div class="home__stat-item">
             <font-awesome-icon icon="chart-line" class="home__stat-icon" />
             <div class="home__stat-content">
-              <div class="home__stat-value">#--</div>
+              <div class="home__stat-value">{{ stats.ranking_position ? `#${stats.ranking_position}` : '#--' }}</div>
               <div class="home__stat-label">Ranking</div>
             </div>
           </div>
@@ -80,40 +80,65 @@
           </div>
         </Card>
       </div>
-
-      <div class="home__progress">
-        <Card variant="outlined" class="home__progress-card">
-          <h3 class="home__progress-title">Seu Progresso</h3>
-          <div class="home__progress-item">
-            <div class="home__progress-header">
-              <span class="home__progress-label">Quizzes Completos</span>
-              <span class="home__progress-value">0 / 10</span>
-            </div>
-            <div class="home__progress-bar">
-              <div class="home__progress-fill" style="width: 0%"></div>
-            </div>
-          </div>
-        </Card>
-      </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import { ref, onMounted } from 'vue'
 import Button from '@/components/Button.vue'
 import Card from '@/components/Card.vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { api } from '@/services/api'
 
 const router = useRouter()
 const authStore = useAuthStore()
+
+const stats = ref({
+  total_quizzes: 0,
+  accuracy: 0,
+  ranking_position: null as number | null
+})
+
+const loading = ref(false)
+
+async function loadStats() {
+  if (!authStore.isAuthenticated) {
+    return
+  }
+
+  loading.value = true
+  try {
+    // Buscar estatísticas do usuário
+    const userStats = await api.users.getStats()
+    stats.value.total_quizzes = userStats.total_quizzes || 0
+    stats.value.accuracy = userStats.accuracy || 0
+
+    // Buscar posição no ranking
+    try {
+      const ranking = await api.ranking.get('all')
+      const currentUser = ranking.find(u => u.user_id === authStore.user?.id)
+      if (currentUser) {
+        stats.value.ranking_position = currentUser.position
+      }
+    } catch (err) {
+      console.warn('Erro ao buscar ranking:', err)
+      // Não é crítico, apenas não mostra a posição
+    }
+  } catch (error) {
+    console.error('Erro ao carregar estatísticas:', error)
+  } finally {
+    loading.value = false
+  }
+}
 
 function handleStart() {
   router.push('/categorias')
 }
 
 function handleRanking() {
-  console.log('Ver ranking')
+  router.push('/ranking')
 }
 
 function goToProfile() {
@@ -127,6 +152,10 @@ async function handleLogout() {
     console.error('Erro ao fazer logout:', error)
   }
 }
+
+onMounted(() => {
+  loadStats()
+})
 </script>
 
 <style scoped>
@@ -314,59 +343,6 @@ async function handleLogout() {
   flex-shrink: 0;
 }
 
-.home__progress {
-  margin-bottom: 20px;
-}
-
-.home__progress-card {
-  padding: 20px;
-}
-
-.home__progress-title {
-  font-size: 16px;
-  font-weight: 700;
-  color: var(--green-dark);
-  margin: 0 0 16px 0;
-}
-
-.home__progress-item {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.home__progress-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.home__progress-label {
-  font-size: 13px;
-  color: var(--black-soft);
-  font-weight: 500;
-}
-
-.home__progress-value {
-  font-size: 13px;
-  color: var(--green-primary);
-  font-weight: 600;
-}
-
-.home__progress-bar {
-  height: 8px;
-  background: var(--gray-light);
-  border-radius: var(--border-radius-full);
-  overflow: hidden;
-}
-
-.home__progress-fill {
-  height: 100%;
-  background: linear-gradient(90deg, var(--green-primary) 0%, var(--green-light) 100%);
-  border-radius: var(--border-radius-full);
-  transition: width var(--transition-base);
-}
-
 @media (min-width: 768px) {
   .home {
     padding: 24px;
@@ -452,24 +428,6 @@ async function handleLogout() {
   }
 
   .home__section-description {
-    font-size: 14px;
-  }
-
-  .home__progress {
-    margin-bottom: 24px;
-  }
-
-  .home__progress-card {
-    padding: 24px;
-  }
-
-  .home__progress-title {
-    font-size: 18px;
-    margin-bottom: 20px;
-  }
-
-  .home__progress-label,
-  .home__progress-value {
     font-size: 14px;
   }
 }

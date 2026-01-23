@@ -649,6 +649,17 @@ def update_profile():
 
 @app.route('/api/ranking', methods=['GET'])
 def get_ranking():
+    from datetime import datetime, timedelta
+    
+    period = request.args.get('period', 'all')  # all, week, month
+    
+    # Calcular data de corte baseada no período
+    cutoff_date = None
+    if period == 'week':
+        cutoff_date = datetime.utcnow() - timedelta(days=7)
+    elif period == 'month':
+        cutoff_date = datetime.utcnow() - timedelta(days=30)
+    
     users = User.query.all()
     ranking = []
     
@@ -656,10 +667,34 @@ def get_ranking():
         # Garantir que a pontuação não seja negativa
         user.ensure_non_negative_score()
         
-        attempts = QuizAttempt.query.filter_by(user_id=user.id).all()
+        # Filtrar tentativas por período se necessário
+        if cutoff_date:
+            attempts = QuizAttempt.query.filter_by(user_id=user.id).filter(
+                QuizAttempt.answered_at >= cutoff_date
+            ).all()
+            # Para períodos específicos, mostrar usuários mesmo sem tentativas (com pontuação 0)
+        else:
+            attempts = QuizAttempt.query.filter_by(user_id=user.id).all()
+            # Para "all", mostrar todos os usuários, mesmo sem tentativas
+        
         total = len(attempts)
         correct = sum(1 for a in attempts if a.is_correct)
         accuracy = (correct / total * 100) if total > 0 else 0
+        
+        # Calcular pontuação do período ou usar total_score
+        if cutoff_date:
+            # Para períodos específicos, calcular apenas os pontos das tentativas no período
+            if attempts:
+                period_score = sum(a.points for a in attempts)
+                if period_score < 0:
+                    period_score = 0
+                total_score = period_score
+            else:
+                # Sem tentativas no período, pontuação 0
+                total_score = 0
+        else:
+            # Para "all", usar o total_score do usuário (mesmo que seja 0)
+            total_score = user.total_score if user.total_score else 0
         
         ranking.append({
             'user_id': user.id,
@@ -667,7 +702,7 @@ def get_ranking():
             'total_quizzes': total,
             'correct_answers': correct,
             'accuracy': round(accuracy, 2),
-            'total_score': user.total_score  # Sempre >= 0
+            'total_score': total_score
         })
     
     # Garantir que todas as pontuações sejam não-negativas antes de ordenar
@@ -1017,4 +1052,6 @@ if __name__ == '__main__':
             start_auto_sync()
     
     app.logger.info('Starting Flask application...')
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    # Usar debug apenas se FLASK_DEBUG estiver ativado
+    debug_mode = app.config.get('FLASK_DEBUG', False)
+    app.run(debug=debug_mode, host='0.0.0.0', port=5000)

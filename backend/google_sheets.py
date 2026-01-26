@@ -679,49 +679,62 @@ def _acquire_db_lock(db_instance, lock_name='sync_questions', timeout=300, logge
                 # Se falhar, assumir que outro processo criou
                 db_instance.session.rollback()
         
-        # Tentar adquirir o lock
+        # Tentar adquirir o lock usando INSERT ... ON CONFLICT (PostgreSQL)
+        # Isso é atômico e evita race conditions
         try:
-            # Tentar inserir o lock (se já existir, vai dar erro de integridade)
-            db_instance.session.execute(text(
-                """INSERT INTO sync_locks (lock_name, process_id) 
-                   VALUES (:lock_name, :process_id)"""
-            ), {'lock_name': lock_name, 'process_id': os.getpid()})
-            db_instance.session.commit()
-            return True
-        except IntegrityError:
-            # Lock já existe, verificar se está expirado (mais de timeout segundos)
-            db_instance.session.rollback()
+            # Usar INSERT ... ON CONFLICT DO NOTHING para tentar adquirir o lock
+            # Se conseguir inserir, adquirimos o lock
             result = db_instance.session.execute(text(
-                """SELECT acquired_at FROM sync_locks 
-                   WHERE lock_name = :lock_name"""
-            ), {'lock_name': lock_name}).fetchone()
+                """INSERT INTO sync_locks (lock_name, process_id, acquired_at) 
+                   VALUES (:lock_name, :process_id, CURRENT_TIMESTAMP)
+                   ON CONFLICT (lock_name) DO NOTHING
+                   RETURNING lock_name"""
+            ), {'lock_name': lock_name, 'process_id': os.getpid()})
             
-            if result:
-                acquired_at = result[0]
-                # Calcular tempo decorrido
-                if isinstance(acquired_at, datetime):
-                    elapsed = (datetime.utcnow() - acquired_at).total_seconds()
-                else:
-                    elapsed = 0
+            inserted = result.fetchone()
+            db_instance.session.commit()
+            
+            if inserted:
+                # Conseguimos inserir, lock adquirido
+                return True
+            else:
+                # Não conseguimos inserir, lock já existe - verificar se está expirado
+                result = db_instance.session.execute(text(
+                    """SELECT acquired_at, process_id FROM sync_locks 
+                       WHERE lock_name = :lock_name"""
+                ), {'lock_name': lock_name}).fetchone()
+                
+                if result:
+                    acquired_at, lock_process_id = result
+                    # Calcular tempo decorrido
+                    if isinstance(acquired_at, datetime):
+                        elapsed = (datetime.utcnow() - acquired_at).total_seconds()
+                    else:
+                        elapsed = 0
                     
-                if elapsed > timeout:
-                    # Lock expirado, remover e tentar novamente
-                    db_instance.session.execute(text(
-                        """DELETE FROM sync_locks WHERE lock_name = :lock_name"""
-                    ), {'lock_name': lock_name})
-                    db_instance.session.commit()
-                    # Tentar inserir novamente
-                    try:
+                    # Se expirado ou se for do mesmo processo (pode ter ficado preso), remover
+                    if elapsed > timeout or lock_process_id == os.getpid():
                         db_instance.session.execute(text(
-                            """INSERT INTO sync_locks (lock_name, process_id) 
-                               VALUES (:lock_name, :process_id)"""
-                        ), {'lock_name': lock_name, 'process_id': os.getpid()})
+                            """DELETE FROM sync_locks WHERE lock_name = :lock_name"""
+                        ), {'lock_name': lock_name})
                         db_instance.session.commit()
-                        return True
-                    except IntegrityError:
-                        # Ainda não conseguiu (outro processo pegou)
-                        db_instance.session.rollback()
-                        return False
+                        # Tentar inserir novamente
+                        result = db_instance.session.execute(text(
+                            """INSERT INTO sync_locks (lock_name, process_id, acquired_at) 
+                               VALUES (:lock_name, :process_id, CURRENT_TIMESTAMP)
+                               ON CONFLICT (lock_name) DO NOTHING
+                               RETURNING lock_name"""
+                        ), {'lock_name': lock_name, 'process_id': os.getpid()})
+                        inserted = result.fetchone()
+                        db_instance.session.commit()
+                        return inserted is not None
+                
+                # Lock existe e não está expirado
+                return False
+        except Exception as e:
+            db_instance.session.rollback()
+            if logger:
+                logger.error(f'[SYNC-QUESTIONS] Error acquiring lock: {str(e)}', exc_info=True)
             return False
     except Exception as e:
         if logger:

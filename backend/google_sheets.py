@@ -624,20 +624,60 @@ def _acquire_db_lock(db_instance, lock_name='sync_questions', timeout=300, logge
     Retorna True se conseguiu adquirir o lock, False caso contrário.
     """
     try:
-        # Usar uma tabela de locks ou uma query que bloqueia
-        # PostgreSQL: SELECT FOR UPDATE NOWAIT bloqueia até conseguir o lock
-        # Vamos usar uma abordagem mais simples: tentar inserir em uma tabela de locks
-        # Se já existe, significa que outro processo está sincronizando
-        
-        # Criar tabela de locks se não existir (usando raw SQL)
-        db_instance.session.execute(text(
-            """CREATE TABLE IF NOT EXISTS sync_locks (
-                lock_name VARCHAR(100) PRIMARY KEY,
-                acquired_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                process_id INTEGER
-            )"""
-        ))
-        db_instance.session.commit()
+        # Verificar se a tabela existe usando information_schema (mais confiável)
+        try:
+            result = db_instance.session.execute(text(
+                """SELECT EXISTS (
+                    SELECT FROM information_schema.tables 
+                    WHERE table_schema = 'public' 
+                    AND table_name = 'sync_locks'
+                )"""
+            )).scalar()
+            
+            if not result:
+                # Tabela não existe, criar
+                try:
+                    db_instance.session.execute(text(
+                        """CREATE TABLE sync_locks (
+                            lock_name VARCHAR(100) PRIMARY KEY,
+                            acquired_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                            process_id INTEGER
+                        )"""
+                    ))
+                    db_instance.session.commit()
+                except Exception as create_error:
+                    # Se der erro ao criar (pode ser que outro processo já criou), fazer rollback
+                    db_instance.session.rollback()
+                    # Verificar novamente se a tabela existe agora (outro processo pode ter criado)
+                    result = db_instance.session.execute(text(
+                        """SELECT EXISTS (
+                            SELECT FROM information_schema.tables 
+                            WHERE table_schema = 'public' 
+                            AND table_name = 'sync_locks'
+                        )"""
+                    )).scalar()
+                    
+                    if not result:
+                        # Ainda não existe, logar o erro
+                        if logger:
+                            logger.warning(f'[SYNC-QUESTIONS] Could not create sync_locks table: {str(create_error)}')
+                        return False
+        except Exception as check_error:
+            # Erro ao verificar, tentar criar de qualquer forma
+            if logger:
+                logger.warning(f'[SYNC-QUESTIONS] Error checking sync_locks table: {str(check_error)}')
+            try:
+                db_instance.session.execute(text(
+                    """CREATE TABLE sync_locks (
+                        lock_name VARCHAR(100) PRIMARY KEY,
+                        acquired_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        process_id INTEGER
+                    )"""
+                ))
+                db_instance.session.commit()
+            except Exception:
+                # Se falhar, assumir que outro processo criou
+                db_instance.session.rollback()
         
         # Tentar adquirir o lock
         try:

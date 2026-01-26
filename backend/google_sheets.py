@@ -646,38 +646,20 @@ def _acquire_db_lock(db_instance, lock_name='sync_questions', timeout=300, logge
                     ))
                     db_instance.session.commit()
                 except Exception as create_error:
-                    # Se der erro ao criar (pode ser que outro processo já criou), fazer rollback
+                    # Se der erro ao criar (pode ser tipo duplicado ou outro processo criou), fazer rollback
                     db_instance.session.rollback()
-                    # Verificar novamente se a tabela existe agora (outro processo pode ter criado)
-                    result = db_instance.session.execute(text(
-                        """SELECT EXISTS (
-                            SELECT FROM information_schema.tables 
-                            WHERE table_schema = 'public' 
-                            AND table_name = 'sync_locks'
-                        )"""
-                    )).scalar()
-                    
-                    if not result:
-                        # Ainda não existe, logar o erro
-                        if logger:
-                            logger.warning(f'[SYNC-QUESTIONS] Could not create sync_locks table: {str(create_error)}')
-                        return False
+                    # Ignorar o erro - a tabela pode já existir de alguma forma
+                    # Ou pode ter sido criada por outro processo
+                    if logger:
+                        logger.debug(f'[SYNC-QUESTIONS] Could not create sync_locks table (may already exist): {str(create_error)}')
+                    # Continuar - vamos tentar usar a tabela mesmo assim
         except Exception as check_error:
-            # Erro ao verificar, tentar criar de qualquer forma
+            # Erro ao verificar, tentar usar a tabela diretamente (pode já existir)
+            # Se não existir, vai dar erro ao tentar usar, mas vamos ignorar
             if logger:
-                logger.warning(f'[SYNC-QUESTIONS] Error checking sync_locks table: {str(check_error)}')
-            try:
-                db_instance.session.execute(text(
-                    """CREATE TABLE sync_locks (
-                        lock_name VARCHAR(100) PRIMARY KEY,
-                        acquired_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                        process_id INTEGER
-                    )"""
-                ))
-                db_instance.session.commit()
-            except Exception:
-                # Se falhar, assumir que outro processo criou
-                db_instance.session.rollback()
+                logger.debug(f'[SYNC-QUESTIONS] Error checking sync_locks table, assuming it exists: {str(check_error)}')
+            # Não tentar criar, apenas assumir que existe e continuar
+            # A tabela deve ser criada pela migration
         
         # Tentar adquirir o lock usando INSERT ... ON CONFLICT (PostgreSQL)
         # Isso é atômico e evita race conditions
@@ -789,8 +771,9 @@ def sync_questions_from_sheets():
         
         app.logger.info(f'[SYNC-QUESTIONS] Found {len(existing_questions)} existing questions in database')
         
-        # Adicionar novas questões
+        # Adicionar novas questões e atualizar existentes
         added_count = 0
+        updated_count = 0
         skipped_count = 0
         error_count = 0
         
@@ -802,15 +785,73 @@ def sync_questions_from_sheets():
             external_id = q_data['external_id']
             sheet_external_ids.add(str(external_id))
             
-            # Verificar se a questão já existe (verificação dupla para evitar race conditions)
+            # Verificar se a questão já existe
+            existing_q = None
             if external_id in existing_questions:
-                skipped_count += 1
-                continue
+                existing_q = existing_questions[external_id]
+            else:
+                # Verificar novamente no banco (para evitar race conditions)
+                existing_q = db_instance.session.query(Question).filter_by(external_id=external_id).first()
             
-            # Verificar novamente no banco antes de adicionar (para evitar race conditions)
-            existing_q = db_instance.session.query(Question).filter_by(external_id=external_id).first()
             if existing_q:
-                skipped_count += 1
+                # Questão existe - verificar se precisa atualizar
+                needs_update = False
+                
+                # Comparar campos principais para ver se mudou
+                if (existing_q.song_title != q_data['song_title'] or
+                    existing_q.artist != q_data['artist'] or
+                    existing_q.lyrics != q_data['lyrics'] or
+                    existing_q.statement != q_data['statement'] or
+                    existing_q.correct_answer != q_data['correct_answer'] or
+                    existing_q.option_a != q_data['option_a'] or
+                    existing_q.option_b != q_data['option_b'] or
+                    existing_q.option_c != q_data['option_c'] or
+                    existing_q.option_d != q_data['option_d'] or
+                    existing_q.option_e != q_data['option_e']):
+                    needs_update = True
+                
+                # Comparar campos opcionais
+                drive_url = q_data.get('music_drive_url')
+                if drive_url:
+                    drive_url = process_drive_url(drive_url)
+                
+                if (existing_q.music_drive_url != drive_url or
+                    str(existing_q.composition_year or '') != str(q_data.get('composition_year') or '') or
+                    str(existing_q.enem_year or '') != str(q_data.get('enem_year') or '') or
+                    (existing_q.comment or '') != (q_data.get('comment') or '') or
+                    (existing_q.curiosity or '') != (q_data.get('curiosity') or '') or
+                    (existing_q.category or '') != (q_data.get('category') or '')):
+                    needs_update = True
+                
+                if needs_update:
+                    # Atualizar questão existente
+                    try:
+                        existing_q.song_title = q_data['song_title']
+                        existing_q.artist = q_data['artist']
+                        existing_q.lyrics = q_data['lyrics']
+                        existing_q.statement = q_data['statement']
+                        existing_q.correct_answer = q_data['correct_answer']
+                        existing_q.option_a = q_data['option_a']
+                        existing_q.option_b = q_data['option_b']
+                        existing_q.option_c = q_data['option_c']
+                        existing_q.option_d = q_data['option_d']
+                        existing_q.option_e = q_data['option_e']
+                        existing_q.music_drive_url = drive_url
+                        existing_q.composition_year = q_data.get('composition_year')
+                        existing_q.enem_year = q_data.get('enem_year')
+                        existing_q.comment = q_data.get('comment')
+                        existing_q.curiosity = q_data.get('curiosity')
+                        existing_q.category = q_data.get('category')
+                        
+                        db_instance.session.add(existing_q)
+                        updated_count += 1
+                        app.logger.info(f'[SYNC-QUESTIONS] Updating question: {q_data["song_title"]} by {q_data["artist"]} (ID: {external_id})')
+                    except Exception as e:
+                        error_count += 1
+                        app.logger.error(f'[SYNC-QUESTIONS] Error updating question {external_id}: {str(e)}', exc_info=True)
+                else:
+                    # Questão não mudou, pular
+                    skipped_count += 1
                 continue
             
             # Criar nova questão
@@ -847,17 +888,74 @@ def sync_questions_from_sheets():
                     added_count += 1
                     app.logger.info(f'[SYNC-QUESTIONS] Adding new question: {q_data["song_title"]} by {q_data["artist"]} (ID: {external_id})')
                 except IntegrityError as ie:
-                    # Rollback do flush e pular esta questão (já existe)
+                    # Rollback do flush - questão já existe, tentar atualizar
                     db_instance.session.rollback()
-                    skipped_count += 1
-                    app.logger.warning(f'[SYNC-QUESTIONS] Question {external_id} already exists (duplicate), skipping')
+                    # Buscar a questão existente e atualizar
+                    existing_q = db_instance.session.query(Question).filter_by(external_id=external_id).first()
+                    if existing_q:
+                        try:
+                            # Atualizar todos os campos
+                            existing_q.song_title = q_data['song_title']
+                            existing_q.artist = q_data['artist']
+                            existing_q.lyrics = q_data['lyrics']
+                            existing_q.statement = q_data['statement']
+                            existing_q.correct_answer = q_data['correct_answer']
+                            existing_q.option_a = q_data['option_a']
+                            existing_q.option_b = q_data['option_b']
+                            existing_q.option_c = q_data['option_c']
+                            existing_q.option_d = q_data['option_d']
+                            existing_q.option_e = q_data['option_e']
+                            existing_q.music_drive_url = drive_url
+                            existing_q.composition_year = q_data.get('composition_year')
+                            existing_q.enem_year = q_data.get('enem_year')
+                            existing_q.comment = q_data.get('comment')
+                            existing_q.curiosity = q_data.get('curiosity')
+                            existing_q.category = q_data.get('category')
+                            
+                            db_instance.session.add(existing_q)
+                            updated_count += 1
+                            app.logger.info(f'[SYNC-QUESTIONS] Updating existing question: {q_data["song_title"]} by {q_data["artist"]} (ID: {external_id})')
+                        except Exception as update_error:
+                            error_count += 1
+                            app.logger.error(f'[SYNC-QUESTIONS] Error updating question {external_id}: {str(update_error)}', exc_info=True)
+                    else:
+                        skipped_count += 1
+                        app.logger.warning(f'[SYNC-QUESTIONS] Question {external_id} already exists but not found for update, skipping')
                     continue
             except IntegrityError as ie:
-                # Tratar erro de integridade (duplicata)
+                # Tratar erro de integridade (duplicata) - tentar atualizar
                 db_instance.session.rollback()
-                error_count += 1
-                skipped_count += 1
-                app.logger.warning(f'[SYNC-QUESTIONS] Duplicate question {external_id}, skipping: {str(ie)}')
+                existing_q = db_instance.session.query(Question).filter_by(external_id=external_id).first()
+                if existing_q:
+                    try:
+                        # Atualizar todos os campos
+                        existing_q.song_title = q_data['song_title']
+                        existing_q.artist = q_data['artist']
+                        existing_q.lyrics = q_data['lyrics']
+                        existing_q.statement = q_data['statement']
+                        existing_q.correct_answer = q_data['correct_answer']
+                        existing_q.option_a = q_data['option_a']
+                        existing_q.option_b = q_data['option_b']
+                        existing_q.option_c = q_data['option_c']
+                        existing_q.option_d = q_data['option_d']
+                        existing_q.option_e = q_data['option_e']
+                        existing_q.music_drive_url = drive_url
+                        existing_q.composition_year = q_data.get('composition_year')
+                        existing_q.enem_year = q_data.get('enem_year')
+                        existing_q.comment = q_data.get('comment')
+                        existing_q.curiosity = q_data.get('curiosity')
+                        existing_q.category = q_data.get('category')
+                        
+                        db_instance.session.add(existing_q)
+                        updated_count += 1
+                        app.logger.info(f'[SYNC-QUESTIONS] Updating existing question (from IntegrityError): {q_data["song_title"]} by {q_data["artist"]} (ID: {external_id})')
+                    except Exception as update_error:
+                        error_count += 1
+                        app.logger.error(f'[SYNC-QUESTIONS] Error updating question {external_id}: {str(update_error)}', exc_info=True)
+                else:
+                    error_count += 1
+                    skipped_count += 1
+                    app.logger.warning(f'[SYNC-QUESTIONS] Duplicate question {external_id} but not found for update: {str(ie)}')
                 continue
             except Exception as e:
                 # Outros erros
@@ -887,10 +985,12 @@ def sync_questions_from_sheets():
         
         # Commit todas as mudanças
         try:
-            if added_count > 0 or removed_count > 0:
+            if added_count > 0 or updated_count > 0 or removed_count > 0:
                 db_instance.session.commit()
                 if added_count > 0:
                     app.logger.info(f'[SYNC-QUESTIONS] Successfully added {added_count} new questions')
+                if updated_count > 0:
+                    app.logger.info(f'[SYNC-QUESTIONS] Successfully updated {updated_count} questions')
                 if removed_count > 0:
                     app.logger.info(f'[SYNC-QUESTIONS] Successfully removed {removed_count} questions not in sheet')
             else:
@@ -902,6 +1002,7 @@ def sync_questions_from_sheets():
                 'success': False,
                 'error': f'Database integrity error: {str(ie)}',
                 'added': added_count,
+                'updated': updated_count,
                 'skipped': skipped_count,
                 'removed': removed_count
             }
@@ -912,6 +1013,7 @@ def sync_questions_from_sheets():
                 'success': False,
                 'error': f'Error during commit: {str(e)}',
                 'added': added_count,
+                'updated': updated_count,
                 'skipped': skipped_count,
                 'removed': removed_count
             }
@@ -921,8 +1023,9 @@ def sync_questions_from_sheets():
         
         return {
             'success': True,
-            'message': f'Synchronization completed: {added_count} added, {skipped_count} skipped, {removed_count} removed',
+            'message': f'Synchronization completed: {added_count} added, {updated_count} updated, {skipped_count} skipped, {removed_count} removed',
             'added': added_count,
+            'updated': updated_count,
             'skipped': skipped_count,
             'removed': removed_count,
             'total_in_sheet': len(questions_from_sheet)

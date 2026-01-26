@@ -5,8 +5,10 @@ import re
 import os
 import time
 import threading
+from datetime import datetime
 from flask import current_app
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy import text
 
 def process_drive_url(url):
     """
@@ -612,8 +614,92 @@ def read_questions_from_sheets(max_retries=3, retry_delay=10):
     app.logger.error(f'[SYNC-QUESTIONS] Falhou após {max_retries} tentativas')
     return {'success': False, 'error': 'Failed to read questions after multiple attempts', 'questions': []}
 
-# Lock para evitar sincronizações simultâneas
+# Lock para evitar sincronizações simultâneas (threading lock para mesma thread)
 _sync_lock = threading.Lock()
+
+def _acquire_db_lock(db_instance, lock_name='sync_questions', timeout=300, logger=None):
+    """
+    Adquire um lock no banco de dados usando uma tabela de locks.
+    Funciona entre múltiplos processos/workers do Gunicorn.
+    Retorna True se conseguiu adquirir o lock, False caso contrário.
+    """
+    try:
+        # Usar uma tabela de locks ou uma query que bloqueia
+        # PostgreSQL: SELECT FOR UPDATE NOWAIT bloqueia até conseguir o lock
+        # Vamos usar uma abordagem mais simples: tentar inserir em uma tabela de locks
+        # Se já existe, significa que outro processo está sincronizando
+        
+        # Criar tabela de locks se não existir (usando raw SQL)
+        db_instance.session.execute(text(
+            """CREATE TABLE IF NOT EXISTS sync_locks (
+                lock_name VARCHAR(100) PRIMARY KEY,
+                acquired_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                process_id INTEGER
+            )"""
+        ))
+        db_instance.session.commit()
+        
+        # Tentar adquirir o lock
+        try:
+            # Tentar inserir o lock (se já existir, vai dar erro de integridade)
+            db_instance.session.execute(text(
+                """INSERT INTO sync_locks (lock_name, process_id) 
+                   VALUES (:lock_name, :process_id)"""
+            ), {'lock_name': lock_name, 'process_id': os.getpid()})
+            db_instance.session.commit()
+            return True
+        except IntegrityError:
+            # Lock já existe, verificar se está expirado (mais de timeout segundos)
+            db_instance.session.rollback()
+            result = db_instance.session.execute(text(
+                """SELECT acquired_at FROM sync_locks 
+                   WHERE lock_name = :lock_name"""
+            ), {'lock_name': lock_name}).fetchone()
+            
+            if result:
+                acquired_at = result[0]
+                # Calcular tempo decorrido
+                if isinstance(acquired_at, datetime):
+                    elapsed = (datetime.utcnow() - acquired_at).total_seconds()
+                else:
+                    elapsed = 0
+                    
+                if elapsed > timeout:
+                    # Lock expirado, remover e tentar novamente
+                    db_instance.session.execute(text(
+                        """DELETE FROM sync_locks WHERE lock_name = :lock_name"""
+                    ), {'lock_name': lock_name})
+                    db_instance.session.commit()
+                    # Tentar inserir novamente
+                    try:
+                        db_instance.session.execute(text(
+                            """INSERT INTO sync_locks (lock_name, process_id) 
+                               VALUES (:lock_name, :process_id)"""
+                        ), {'lock_name': lock_name, 'process_id': os.getpid()})
+                        db_instance.session.commit()
+                        return True
+                    except IntegrityError:
+                        # Ainda não conseguiu (outro processo pegou)
+                        db_instance.session.rollback()
+                        return False
+            return False
+    except Exception as e:
+        if logger:
+            logger.error(f'[SYNC-QUESTIONS] Error acquiring DB lock: {str(e)}', exc_info=True)
+        db_instance.session.rollback()
+        return False
+
+def _release_db_lock(db_instance, lock_name='sync_questions', logger=None):
+    """Libera o lock no banco de dados"""
+    try:
+        db_instance.session.execute(text(
+            """DELETE FROM sync_locks WHERE lock_name = :lock_name"""
+        ), {'lock_name': lock_name})
+        db_instance.session.commit()
+    except Exception as e:
+        if logger:
+            logger.error(f'[SYNC-QUESTIONS] Error releasing DB lock: {str(e)}', exc_info=True)
+        db_instance.session.rollback()
 
 def sync_questions_from_sheets():
     """
@@ -624,10 +710,11 @@ def sync_questions_from_sheets():
     from app import db, Question
     
     app = current_app
+    db_instance = app.extensions['sqlalchemy']
     
-    # Usar lock para evitar sincronizações simultâneas
-    if not _sync_lock.acquire(blocking=False):
-        app.logger.warning('[SYNC-QUESTIONS] Sync already in progress, skipping...')
+    # Usar lock de banco de dados para evitar sincronizações simultâneas entre processos
+    if not _acquire_db_lock(db_instance, logger=app.logger):
+        app.logger.warning('[SYNC-QUESTIONS] Sync already in progress (another worker), skipping...')
         return {'success': False, 'error': 'Sync already in progress'}
     
     try:
@@ -636,13 +723,13 @@ def sync_questions_from_sheets():
         # Ler questões da planilha
         result = read_questions_from_sheets()
         if not result.get('success'):
+            _release_db_lock(db_instance, logger=app.logger)
             return result
         
         questions_from_sheet = result.get('questions', [])
         
         # Obter todas as questões existentes no banco (por external_id)
         existing_questions = {}
-        db_instance = app.extensions['sqlalchemy']
         existing = db_instance.session.query(Question).filter(Question.external_id.isnot(None)).all()
         for q in existing:
             existing_questions[str(q.external_id)] = q
@@ -776,7 +863,8 @@ def sync_questions_from_sheets():
                 'removed': removed_count
             }
         finally:
-            _sync_lock.release()
+            # Sempre liberar o lock do banco de dados
+            _release_db_lock(db_instance, logger=app.logger)
         
         return {
             'success': True,

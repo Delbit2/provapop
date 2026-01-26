@@ -4,7 +4,9 @@ from google.oauth2.service_account import Credentials
 import re
 import os
 import time
+import threading
 from flask import current_app
+from sqlalchemy.exc import IntegrityError
 
 def process_drive_url(url):
     """
@@ -610,6 +612,9 @@ def read_questions_from_sheets(max_retries=3, retry_delay=10):
     app.logger.error(f'[SYNC-QUESTIONS] Falhou após {max_retries} tentativas')
     return {'success': False, 'error': 'Failed to read questions after multiple attempts', 'questions': []}
 
+# Lock para evitar sincronizações simultâneas
+_sync_lock = threading.Lock()
+
 def sync_questions_from_sheets():
     """
     Sincroniza questões da planilha Google Sheets com o banco de dados.
@@ -619,6 +624,11 @@ def sync_questions_from_sheets():
     from app import db, Question
     
     app = current_app
+    
+    # Usar lock para evitar sincronizações simultâneas
+    if not _sync_lock.acquire(blocking=False):
+        app.logger.warning('[SYNC-QUESTIONS] Sync already in progress, skipping...')
+        return {'success': False, 'error': 'Sync already in progress'}
     
     try:
         app.logger.info('[SYNC-QUESTIONS] Starting questions synchronization')
@@ -642,6 +652,7 @@ def sync_questions_from_sheets():
         # Adicionar novas questões
         added_count = 0
         skipped_count = 0
+        error_count = 0
         
         # Coletar IDs das questões na planilha
         sheet_external_ids = set()
@@ -651,8 +662,14 @@ def sync_questions_from_sheets():
             external_id = q_data['external_id']
             sheet_external_ids.add(str(external_id))
             
-            # Verificar se a questão já existe
+            # Verificar se a questão já existe (verificação dupla para evitar race conditions)
             if external_id in existing_questions:
+                skipped_count += 1
+                continue
+            
+            # Verificar novamente no banco antes de adicionar (para evitar race conditions)
+            existing_q = db_instance.session.query(Question).filter_by(external_id=external_id).first()
+            if existing_q:
                 skipped_count += 1
                 continue
             
@@ -684,11 +701,30 @@ def sync_questions_from_sheets():
                 )
                 
                 db_instance.session.add(new_question)
-                added_count += 1
-                app.logger.info(f'[SYNC-QUESTIONS] Adding new question: {q_data["song_title"]} by {q_data["artist"]} (ID: {external_id})')
-            except Exception as e:
-                app.logger.error(f'[SYNC-QUESTIONS] Error adding question {external_id}: {str(e)}', exc_info=True)
+                # Tentar fazer flush para detectar erros de integridade antes do commit
+                try:
+                    db_instance.session.flush()
+                    added_count += 1
+                    app.logger.info(f'[SYNC-QUESTIONS] Adding new question: {q_data["song_title"]} by {q_data["artist"]} (ID: {external_id})')
+                except IntegrityError as ie:
+                    # Rollback do flush e pular esta questão (já existe)
+                    db_instance.session.rollback()
+                    skipped_count += 1
+                    app.logger.warning(f'[SYNC-QUESTIONS] Question {external_id} already exists (duplicate), skipping')
+                    continue
+            except IntegrityError as ie:
+                # Tratar erro de integridade (duplicata)
+                db_instance.session.rollback()
+                error_count += 1
                 skipped_count += 1
+                app.logger.warning(f'[SYNC-QUESTIONS] Duplicate question {external_id}, skipping: {str(ie)}')
+                continue
+            except Exception as e:
+                # Outros erros
+                db_instance.session.rollback()
+                error_count += 1
+                skipped_count += 1
+                app.logger.error(f'[SYNC-QUESTIONS] Error adding question {external_id}: {str(e)}', exc_info=True)
                 continue
         
         # Remover questões que não estão mais na planilha
@@ -710,14 +746,37 @@ def sync_questions_from_sheets():
                     app.logger.error(f'[SYNC-QUESTIONS] Error removing question {external_id_str}: {str(e)}', exc_info=True)
         
         # Commit todas as mudanças
-        if added_count > 0 or removed_count > 0:
-            db_instance.session.commit()
-            if added_count > 0:
-                app.logger.info(f'[SYNC-QUESTIONS] Successfully added {added_count} new questions')
-            if removed_count > 0:
-                app.logger.info(f'[SYNC-QUESTIONS] Successfully removed {removed_count} questions not in sheet')
-        else:
-            app.logger.info('[SYNC-QUESTIONS] No changes to sync')
+        try:
+            if added_count > 0 or removed_count > 0:
+                db_instance.session.commit()
+                if added_count > 0:
+                    app.logger.info(f'[SYNC-QUESTIONS] Successfully added {added_count} new questions')
+                if removed_count > 0:
+                    app.logger.info(f'[SYNC-QUESTIONS] Successfully removed {removed_count} questions not in sheet')
+            else:
+                app.logger.info('[SYNC-QUESTIONS] No changes to sync')
+        except IntegrityError as ie:
+            db_instance.session.rollback()
+            app.logger.error(f'[SYNC-QUESTIONS] Integrity error during commit: {str(ie)}', exc_info=True)
+            return {
+                'success': False,
+                'error': f'Database integrity error: {str(ie)}',
+                'added': added_count,
+                'skipped': skipped_count,
+                'removed': removed_count
+            }
+        except Exception as e:
+            db_instance.session.rollback()
+            app.logger.error(f'[SYNC-QUESTIONS] Error during commit: {str(e)}', exc_info=True)
+            return {
+                'success': False,
+                'error': f'Error during commit: {str(e)}',
+                'added': added_count,
+                'skipped': skipped_count,
+                'removed': removed_count
+            }
+        finally:
+            _sync_lock.release()
         
         return {
             'success': True,

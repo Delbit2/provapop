@@ -13,7 +13,7 @@ services:
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-enem_user}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-enem_user} -d ${POSTGRES_DB:-enem_brasil}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -42,12 +42,14 @@ services:
       # CORS
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://localhost:5174,http://localhost:3000}
     volumes:
-      # Montar credentials.json (se existir)
+      # Montar credentials.json (se existir) - opcional
       - ./backend/credentials.json:/app/credentials.json:ro
       # Persistir banco de dados SQLite (se não usar PostgreSQL)
       - backend_instance:/app/instance
       # Persistir migrations
       - backend_migrations:/app/migrations
+    # Não falhar se credentials.json não existir
+    init: true
     ports:
       - "${BACKEND_PORT:-5000}:5000"
     depends_on:
@@ -60,7 +62,9 @@ services:
       sh -c "
         echo 'Waiting for database...' &&
         sleep 5 &&
+        echo 'Running migrations...' &&
         flask db upgrade &&
+        echo 'Starting application...' &&
         gunicorn --bind 0.0.0.0:5000 --workers 4 --timeout 120 --access-logfile - --error-logfile - app:app
       "
 

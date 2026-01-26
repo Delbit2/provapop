@@ -15,9 +15,16 @@ Este guia explica como configurar e executar a aplicação backend usando Docker
 Copie o arquivo de exemplo e ajuste as variáveis:
 
 ```bash
-cp .env.example .env
+# Para Docker (na raiz do projeto)
+cp env.example .env
 nano .env
+
+# Para desenvolvimento local (opcional, se rodar Flask de dentro de backend/)
+cp env.example backend/.env
+nano backend/.env
 ```
+
+**Nota:** No Docker, o `.env` na raiz é suficiente pois as variáveis são passadas via docker-compose. Para desenvolvimento local, você pode usar `.env` na raiz ou em `backend/` dependendo de onde executa o Flask.
 
 **Variáveis importantes:**
 - `SECRET_KEY`: Gere uma chave secreta aleatória para produção

@@ -53,4 +53,3 @@ def upgrade():
 
 
 def downgrade():
-    op.drop_table('sync_locks')

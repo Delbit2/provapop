@@ -3,7 +3,7 @@
     <Transition name="fade" appear>
       <div class="register__container">
         <div class="register__header">
-          <h1 class="register__title">Quiz Musical</h1>
+          <h1 class="register__title">ProvaPoP</h1>
           <p class="register__subtitle">Crie sua conta e comece a estudar</p>
         </div>
 

@@ -27,6 +27,7 @@ services:
     container_name: enem-brasil-backend
     environment:
       # Flask
+      TZ: America/Sao_Paulo
       FLASK_ENV: ${FLASK_ENV:-production}
       FLASK_DEBUG: ${FLASK_DEBUG:-0}
       SECRET_KEY: ${SECRET_KEY:-change-this-secret-key-in-production}
@@ -41,6 +42,7 @@ services:
       
       # CORS
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://localhost:5174,http://localhost:3000}
+      ZOHO_APP_PASSWORD: ${ZOHO_APP_PASSWORD}
     volumes:
       # Montar credentials.json (se existir) - opcional
       - ./backend/credentials.json:/app/credentials.json:ro
@@ -51,7 +53,7 @@ services:
     # Não falhar se credentials.json não existir
     init: true
     ports:
-      - "${BACKEND_PORT:-5000}:5000"
+      - "5001:5000"
     depends_on:
       db:
         condition: service_healthy
@@ -67,6 +69,19 @@ services:
         echo 'Starting application...' &&
         gunicorn --bind 0.0.0.0:5000 --workers 4 --timeout 120 --access-logfile - --error-logfile - app:app
       "
+
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: enem-brasil-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@provapop.com.br
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports:
+      - "5050:80"
+    networks:
+      - enem-network
+    depends_on:
+      - db
 
 volumes:
   postgres_data:

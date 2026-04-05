@@ -52,10 +52,10 @@ interface Category {
 
 const categories = ref<Category[]>([
   {
-    id: 'unicamp',
-    name: 'UNICAMP',
-    description: 'Questões do vestibular da UNICAMP',
-    icon: 'university'
+    id: 'enem',
+    name: 'ENEM',
+    description: 'Questões do Exame Nacional do Ensino Médio',
+    icon: 'certificate'
   },
   {
     id: 'fuvest',
@@ -64,10 +64,10 @@ const categories = ref<Category[]>([
     icon: 'graduation-cap'
   },
   {
-    id: 'enem',
-    name: 'ENEM',
-    description: 'Questões do Exame Nacional do Ensino Médio',
-    icon: 'certificate'
+    id: 'unicamp',
+    name: 'UNICAMP',
+    description: 'Questões do vestibular da UNICAMP',
+    icon: 'university'
   },
   {
     id: 'others',
@@ -298,3 +298,4 @@ function goToHome() {
   }
 }
 </style>
+```__

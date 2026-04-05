@@ -1,6 +1,6 @@
-# Quiz Musical API
+# ProvaPoP API
 
-Backend Flask para o aplicativo Quiz Musical.
+Backend Flask para o aplicativo ProvaPoP.
 
 ## Instalação
 

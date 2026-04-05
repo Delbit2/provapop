@@ -6,6 +6,8 @@ import Register from '@/views/Register.vue'
 import Profile from '@/views/Profile.vue'
 import CategoryMenu from '@/views/CategoryMenu.vue'
 import Ranking from '@/views/Ranking.vue'
+import EsqueciSenha from '@/views/EsqueciSenha.vue'
+import NovaSenha from '@/views/NovaSenha.vue'
 import { useAuthStore } from '@/stores/auth'
 
 const router = createRouter({
@@ -21,6 +23,18 @@ const router = createRouter({
       path: '/cadastro',
       name: 'register',
       component: Register,
+      meta: { requiresGuest: true }
+    },
+    {
+      path: '/esqueci-senha',
+      name: 'forgot-password',
+      component: EsqueciSenha,
+      meta: { requiresGuest: true }
+    },
+    {
+      path: '/nova-senha',
+      name: 'reset-password',
+      component: NovaSenha,
       meta: { requiresGuest: true }
     },
     {
@@ -65,45 +79,31 @@ router.beforeEach(async (to, _from, next) => {
   const authStore = useAuthStore()
   
   if (to.meta.requiresAuth) {
-    // Se já está autenticado localmente, permitir acesso imediatamente
-    // A verificação real será feita nas requisições autenticadas
     if (authStore.isAuthenticated) {
       return next()
     }
     
-    // Se não parece autenticado, verificar com backend
-    // Mas apenas se não estiver vindo de uma rota pública (evita verificação desnecessária)
     const authenticated = await authStore.verifyAuth()
     if (!authenticated) {
-      // Se não estiver autenticado, redirecionar para login
       return next('/entrar')
     }
     
-    // Se autenticado após verificação, permitir acesso
     return next()
   }
   
   if (to.meta.requiresGuest) {
-    // Para rotas de guest, verificar se está autenticado
-    // Se estiver autenticado, redirecionar para home
     if (authStore.isAuthenticated) {
-      // Se parece autenticado localmente, redirecionar imediatamente
       return next('/')
     }
     
-    // Verificar com backend para garantir que não está autenticado
-    // Isso evita que usuários autenticados acessem login/register
     const authenticated = await authStore.verifyAuth()
     if (authenticated) {
-      // Se estiver autenticado, redirecionar para home
       return next('/')
     }
     
-    // Se não está autenticado, permitir acesso à rota de guest
     return next()
   }
   
-  // Para rotas sem meta, permitir acesso
   next()
 })
 

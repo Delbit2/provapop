@@ -4,3 +4,28 @@ dist
 dist-ssr
 *.local
 
+
+# Segredos e Senhas (NUNCA SUBIR)
+.env
+.env.save
+credentials.json
+
+# Backups e Logs (NUNCA SUBIR)
+backups/
+backup_db.sh
+*.backup
+*.save
+.build.log
+
+# Pastas geradas automaticamente
+dev-dist/
+node_modules/
+.env
+.env.save
+credentials.json
+backups/
+backup_db.sh
+*.backup
+*.save
+.build.log
+dev-dist/

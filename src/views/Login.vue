@@ -3,8 +3,8 @@
     <Transition name="fade" appear>
       <div class="login__container">
         <div class="login__header">
-          <h1 class="login__title">Quiz Musical</h1>
-          <p class="login__subtitle">Entre para começar a estudar</p>
+          <h1 class="login__title">ProvaPop!</h1>
+          <p class="login__subtitle">Estude com música!</p>
         </div>
 
         <Card variant="elevated" class="login__card">
@@ -12,13 +12,13 @@
             <div class="login__field">
               <label class="login__label">
                 <font-awesome-icon icon="user" class="login__label-icon" />
-                Email ou Usuário
+                Email
               </label>
               <input
                 v-model="form.email"
                 type="text"
                 class="login__input"
-                placeholder="Digite seu email ou usuário"
+                placeholder="Digite seu email"
                 required
               />
             </div>
@@ -51,7 +51,7 @@
                 <input type="checkbox" v-model="form.remember" />
                 <span>Lembrar-me</span>
               </label>
-              <a href="#" class="login__forgot">Esqueci minha senha</a>
+              <a href="#" @click.prevent="goToForgot" class="login__forgot">Esqueci minha senha</a>
             </div>
 
             <div v-if="authStore.error" class="login__error">
@@ -81,10 +81,12 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
+import { useRouter } from 'vue-router'
 import Card from '@/components/Card.vue'
 import Button from '@/components/Button.vue'
 import { useAuthStore } from '@/stores/auth'
 
+const router = useRouter()
 const authStore = useAuthStore()
 
 const form = ref({
@@ -107,8 +109,9 @@ function goToRegister() {
   router.push('/cadastro')
 }
 
-import { useRouter } from 'vue-router'
-const router = useRouter()
+function goToForgot() {
+  router.push('/esqueci-senha')
+}
 </script>
 
 <style scoped>

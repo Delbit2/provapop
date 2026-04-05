@@ -9,7 +9,7 @@
             </button>
             <div class="ranking__header-content">
               <h1 class="ranking__title">Ranking</h1>
-              <p class="ranking__subtitle">Top jogadores do Quiz Musical</p>
+              <p class="ranking__subtitle">Top jogadores do ProvaPoP</p>
             </div>
           </div>
 

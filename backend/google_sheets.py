@@ -5,7 +5,7 @@ import re
 import os
 import time
 import threading
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from flask import current_app
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import text
@@ -133,8 +133,8 @@ def sync_user_to_sheets_with_data(user_id, user_data):
         
         app.logger.info(f'[SYNC] Syncing user: {user_data["nickname"]} ({user_data["email"]})')
         
-        from datetime import datetime
-        last_updated = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
+        from datetime import datetime, timezone, timedelta
+        last_updated = datetime.now(timezone(timedelta(hours=-3))).strftime('%Y-%m-%d %H:%M:%S')
         
         app.logger.info(f'[SYNC] Searching for user_id {user_id} in column 1')
         cell = worksheet.find(str(user_id), in_column=1)
@@ -249,8 +249,8 @@ def sync_user_to_sheets(user_id):
         correct_attempts = sum(1 for a in attempts if a.is_correct)
         accuracy = round((correct_attempts / total_attempts * 100) if total_attempts > 0 else 0, 2)
         
-        from datetime import datetime
-        last_updated = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
+        from datetime import datetime, timezone, timedelta
+        last_updated = datetime.now(timezone(timedelta(hours=-3))).strftime('%Y-%m-%d %H:%M:%S')
         
         app.logger.info(f'[SYNC] Searching for user_id {user_id} in column 1')
         cell = worksheet.find(str(user_id), in_column=1)
@@ -358,8 +358,8 @@ def sync_ranking_to_sheets():
         for i, entry in enumerate(ranking_data, 1):
             entry['position'] = i
         
-        from datetime import datetime
-        last_updated = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
+        from datetime import datetime, timezone, timedelta
+        last_updated = datetime.now(timezone(timedelta(hours=-3))).strftime('%Y-%m-%d %H:%M:%S')
         
         worksheet.clear()
         headers = ['ID', 'Apelido', 'Email', 'Total de Quizzes', 'Respostas Corretas', 'Taxa de Acerto (%)', 'Pontuação Total', 'Posição', 'Última Atualização']
@@ -430,13 +430,13 @@ def read_questions_from_sheets(max_retries=3, retry_delay=10):
             
             # Mapear índices das colunas
             col_map = {}
-            expected_cols = ['ID', 'Autor', 'Titulo', 'Trecho_Letra', 'Enunciado', 'A', 'B', 'C', 'D', 'E', 'Alternativa_Correta', 'Musica_Drive', 'Ano_Composicao', 'Ano_ENEM', 'Comentario', 'Curiosidade', 'Categoria']
+            expected_cols = ['ID', 'Autor', 'Titulo', 'Trecho_Letra', 'Enunciado', 'A', 'B', 'C', 'D', 'E', 'Alternativa_Correta', 'Musica_Drive', 'Ano_Lancamento', 'Ano_Prova', 'Comentario', 'Curiosidade', 'Categoria']
             for col in expected_cols:
                 try:
                     col_map[col] = headers.index(col)
                 except ValueError:
-                    # Colunas opcionais (Ano_Composicao, Ano_ENEM, Comentario, Curiosidade, Categoria) não são obrigatórias
-                    if col in ['Ano_Composicao', 'Ano_ENEM', 'Comentario', 'Curiosidade', 'Categoria']:
+                    # Colunas opcionais (Ano_Lancamento, Ano_Prova, Comentario, Curiosidade, Categoria) não são obrigatórias
+                    if col in ['Ano_Lancamento', 'Ano_Prova', 'Comentario', 'Curiosidade', 'Categoria']:
                         app.logger.warning(f'Optional column "{col}" not found in sheet headers, will use empty value')
                         col_map[col] = None
                     else:
@@ -466,16 +466,16 @@ def read_questions_from_sheets(max_retries=3, retry_delay=10):
                     
                     # Novas colunas opcionais
                     composition_year = None
-                    if col_map.get('Ano_Composicao') is not None and col_map['Ano_Composicao'] < len(row) and row[col_map['Ano_Composicao']]:
+                    if col_map.get('Ano_Lancamento') is not None and col_map['Ano_Lancamento'] < len(row) and row[col_map['Ano_Lancamento']]:
                         try:
-                            composition_year = int(row[col_map['Ano_Composicao']].strip())
+                            composition_year = int(row[col_map['Ano_Lancamento']].strip())
                         except (ValueError, AttributeError):
                             composition_year = None
                     
                     enem_year = None
-                    if col_map.get('Ano_ENEM') is not None and col_map['Ano_ENEM'] < len(row) and row[col_map['Ano_ENEM']]:
+                    if col_map.get('Ano_Prova') is not None and col_map['Ano_Prova'] < len(row) and row[col_map['Ano_Prova']]:
                         try:
-                            enem_year = int(row[col_map['Ano_ENEM']].strip())
+                            enem_year = int(row[col_map['Ano_Prova']].strip())
                         except (ValueError, AttributeError):
                             enem_year = None
                     
@@ -690,7 +690,7 @@ def _acquire_db_lock(db_instance, lock_name='sync_questions', timeout=300, logge
                     acquired_at, lock_process_id = result
                     # Calcular tempo decorrido
                     if isinstance(acquired_at, datetime):
-                        elapsed = (datetime.utcnow() - acquired_at).total_seconds()
+                        elapsed = (datetime.now() - acquired_at).total_seconds()
                     else:
                         elapsed = 0
                     

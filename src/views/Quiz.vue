@@ -71,7 +71,7 @@
               <font-awesome-icon icon="arrow-left" />
             </button>
             <div class="quiz__header-content">
-              <h2 class="quiz__title">Quiz Musical - {{ categoryName }}</h2>
+              <h2 class="quiz__title">ProvaPop! - {{ categoryName }}</h2>
               <div class="quiz__header-info">
                 <div class="quiz__question-number">
                   Questão {{ currentQuestionIndex + 1 }} de {{ filteredQuestions.length }}
@@ -136,36 +136,37 @@
               <div class="quiz__audio-section">
                 <button 
                   class="quiz__play-btn" 
-                  @click="togglePlay" 
+                  @click="playYoutube" 
                   :class="{ 'quiz__play-btn--playing': isPlaying }"
-                  :disabled="!currentQuestion.music_drive_url"
+                  :disabled="!youtubeVideoId || isPlaying"
                 >
-                  <font-awesome-icon :icon="isPlaying ? 'pause' : 'play'" class="quiz__play-icon" />
+                  <font-awesome-icon icon="play" class="quiz__play-icon" />
                 </button>
                 <div class="quiz__audio-info">
                   <div class="quiz__audio-title">
                     {{ currentQuestion.artist }} - {{ currentQuestion.song_title }}
                   </div>
-                  <div class="quiz__audio-progress" v-if="isPlaying && audioElement">
-                    <div 
-                      class="quiz__audio-progress-bar" 
-                      :style="{ width: audioProgress + '%' }"
-                    ></div>
+                  <span v-if="isPlaying" style="font-size: 13px; color: var(--green-primary); font-weight: bold;">
+                    >>>playing>>>
+                  </span>
+                  
+                  <!-- BARRINHA DE PROGRESSO -->
+                  <div class="quiz__audio-progress" v-if="isPlaying && audioDuration > 0" style="margin-top: 8px;">
+                    <div class="quiz__audio-progress-bar" :style="{ width: `${audioProgress}%` }"></div>
                   </div>
-                  <audio
-                    ref="audioElement"
-                    :src="getAudioUrl(currentQuestion.music_drive_url)"
-                    @timeupdate="updateAudioProgress"
-                    @ended="onAudioEnded"
-                    @loadedmetadata="onAudioLoaded"
-                    @error="onAudioError"
-                    @canplaythrough="onAudioLoaded"
-                    preload="metadata"
-                    style="display: none;"
-                  ></audio>
+
+                   <!-- Player do YouTube (Modo JS API para enganar o Safari) -->
+                  <iframe 
+                    ref="youtubeIframe"
+                    v-show="youtubeVideoId"
+                    :src="youtubeUrl"
+                    allow="autoplay; encrypted-media"
+                    style="width: 200px; height: 150px; opacity: 0.01; position: absolute; top: 0; left: 0; pointer-events: none;"
+                  ></iframe>
+
                 </div>
               </div>
-              
+
               <!-- Year Information -->
               <div class="quiz__years-info" v-if="currentQuestion.composition_year || currentQuestion.enem_year">
                 <div class="quiz__year-badge" v-if="currentQuestion.composition_year">
@@ -179,19 +180,7 @@
                   <span class="quiz__year-value">{{ currentQuestion.enem_year }}</span>
                 </div>
               </div>
-            </div>
-
-            <!-- Comment Section (só aparece quando acertar) -->
-            <div class="quiz__comment-section" v-if="isCorrect && currentQuestion.comment">
-              <div class="quiz__comment-header">
-                <font-awesome-icon icon="comment" class="quiz__comment-icon" />
-                <h3 class="quiz__comment-title">Comentário</h3>
-              </div>
-              <div class="quiz__comment-content">
-                <p>{{ currentQuestion.comment }}</p>
-              </div>
-            </div>
-
+            
             <div class="quiz__lyrics" v-if="currentQuestion.lyrics">
               <div class="quiz__lyrics-text">
                 <p v-for="(line, index) in lyricsLines" :key="index">{{ line }}</p>
@@ -243,7 +232,6 @@
           </div>
 
             <div class="quiz__feedback" v-if="answered">
-              <!-- Aviso se já foi respondida antes -->
               <div v-if="alreadyAnswered" class="quiz__already-answered-warning">
                 <font-awesome-icon icon="info-circle" class="quiz__warning-icon" />
                 <p>
@@ -272,7 +260,18 @@
                 </div>
               </div>
 
-              <!-- Curiosidade Section (só aparece quando acertar) -->
+            <!-- Comment Section -->
+            <div class="quiz__comment-section" v-if="isCorrect && currentQuestion.comment">
+              <div class="quiz__comment-header">
+                <font-awesome-icon icon="comment" class="quiz__comment-icon" />
+                <h3 class="quiz__comment-title">Comentário</h3>
+              </div>
+              <div class="quiz__comment-content">
+                <p>{{ currentQuestion.comment }}</p>
+              </div>
+            </div>
+
+              <!-- Curiosidade Section -->
               <div class="quiz__curiosity-section" v-if="isCorrect && currentQuestion.curiosity">
                 <div class="quiz__curiosity-header">
                   <font-awesome-icon icon="star" class="quiz__curiosity-icon" />
@@ -303,9 +302,7 @@
               >
                 Finalizar Quiz
               </Button>
-            </div>
-          </div>
-        </template>
+            </div></div></div></template>
       </Card>
     </div>
   </div>
@@ -320,18 +317,16 @@ import Button from '@/components/Button.vue'
 import OptionButton from '@/components/OptionButton.vue'
 import { api } from '@/services/api'
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
 const router = useRouter()
 const route = useRoute()
 
-// Category information
 const category = computed(() => (route.params.category as string) || 'enem')
 
 const categoryNames: Record<string, string> = {
-  'unicamp': 'UNICAMP',
-  'fuvest': 'FUVEST',
   'enem': 'ENEM',
-  'others': 'Outros'
+  'fuvest': 'FUVEST',
+  'unicamp': 'UNICAMP',
+  'outros': 'Outros'
 }
 
 const categoryName = computed(() => categoryNames[category.value] || 'ENEM')
@@ -339,23 +334,60 @@ const categoryName = computed(() => categoryNames[category.value] || 'ENEM')
 // State
 const loading = ref(true)
 const error = ref<string | null>(null)
-const allQuestions = ref<any[]>([]) // Todas as questões carregadas
+const allQuestions = ref<any[]>([]) 
 const currentQuestionIndex = ref(0)
 const selectedOption = ref<number | null>(null)
 const answered = ref(false)
 const isCorrect = ref(false)
 const correctAnswer = ref('')
+
+// VARIAVEIS DO PLAYER
 const isPlaying = ref(false)
-const audioElement = ref<HTMLAudioElement | null>(null)
+const youtubeIframe = ref<HTMLIFrameElement | null>(null)
 const audioProgress = ref(0)
+const audioDuration = ref(0)
+let progressInterval: any = null
+
+// Mágicas do YouTube
+const youtubeVideoId = computed(() => {
+  const rawData = currentQuestion.value?.music_drive_url
+  if (!rawData) return null
+  const firstPart = rawData.split(',')[0].trim()
+  if (firstPart.includes('youtu')) {
+    const regExp = /^.*(youtu\.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/
+    const match = firstPart.match(regExp)
+    return (match && match[2].length === 11) ? match[2] : null
+  }
+  return firstPart.length === 11 ? firstPart : null
+})
+
+const youtubeStartTime = computed(() => {
+  const rawData = currentQuestion.value?.music_drive_url
+  if (!rawData) return ''
+  const parts = rawData.split(',')
+  return parts[1] ? parts[1].trim() : '' 
+})
+
+const youtubeEndTime = computed(() => {
+  const rawData = currentQuestion.value?.music_drive_url
+  if (!rawData) return ''
+  const parts = rawData.split(',')
+  return parts[2] ? parts[2].trim() : '' 
+})
+
+// Aqui está o truque principal: Carregamos o URL antes, com a API de JS ativada (enablejsapi=1)
+const youtubeUrl = computed(() => {
+  if (!youtubeVideoId.value) return 'about:blank'
+  return `https://www.youtube.com/embed/${youtubeVideoId.value}?enablejsapi=1&controls=0&playsinline=1&start=${youtubeStartTime.value}&end=${youtubeEndTime.value}`
+})
+
 const alreadyAnswered = ref(false)
 const previousResult = ref<boolean | null>(null)
 const pointsEarned = ref(false)
 const pointsValue = ref(0)
-const viewMode = ref<'unanswered' | 'answered'>('unanswered') // Modo de visualização
-const displayedQuestion = ref<any>(null) // Questão que está sendo exibida (mantém referência mesmo após ser respondida)
+const viewMode = ref<'unanswered' | 'answered'>('unanswered') 
+const displayedQuestion = ref<any>(null) 
 
-// Computed - Separar questões em respondidas e não respondidas
 const answeredQuestions = computed(() => {
   return allQuestions.value.filter(q => q.already_answered === true)
 })
@@ -364,34 +396,26 @@ const unansweredQuestions = computed(() => {
   return allQuestions.value.filter(q => !q.already_answered || q.already_answered === false)
 })
 
-// Computed - Questões filtradas baseadas no modo de visualização
 const filteredQuestions = computed(() => {
   return viewMode.value === 'unanswered' ? unansweredQuestions.value : answeredQuestions.value
 })
 
-// Computed - Questão atual baseada nas questões filtradas
-// Se há uma questão sendo exibida (displayedQuestion) após responder, usa ela para manter a questão na tela
 const currentQuestion = computed(() => {
-  // Se há uma questão sendo exibida (após responder), mantém ela até o usuário avançar
   if (displayedQuestion.value && answered.value) {
     return displayedQuestion.value
   }
-  // Caso contrário, usa a questão filtrada normalmente
   if (filteredQuestions.value.length === 0) return null
   if (currentQuestionIndex.value >= filteredQuestions.value.length) {
     currentQuestionIndex.value = 0
   }
   const question = filteredQuestions.value[currentQuestionIndex.value]
-  // Atualizar displayedQuestion quando mudar de questão (antes de responder)
   if (!answered.value && question) {
     displayedQuestion.value = question
   }
   return question
 })
 
-// Computed - Contagem total de questões
 const totalQuestionsCount = computed(() => allQuestions.value.length)
-
 const hasNextQuestion = computed(() => currentQuestionIndex.value < filteredQuestions.value.length - 1)
 const hasPreviousQuestion = computed(() => currentQuestionIndex.value > 0)
 const lyricsLines = computed(() => {
@@ -410,35 +434,25 @@ const questionOptions = computed(() => {
   ]
 })
 
-// Load questions from API
 async function loadQuestions(forceRefresh = false) {
   loading.value = true
   error.value = null
   try {
-    // Carregar questões da API
-    // Se forceRefresh, aguardar um pouco para dar tempo da sincronização no backend
     if (forceRefresh) {
-      // Aguardar 2 segundos para dar tempo da sincronização no backend após login
       await new Promise(resolve => setTimeout(resolve, 2000))
     }
-    
-    // Obter categoria da rota e mapear para o formato esperado pelo backend
     const categoryParam = category.value
-    // Mapear categorias do frontend (minúsculas) para backend (primeira letra maiúscula)
     const categoryMap: Record<string, string> = {
       'unicamp': 'Unicamp',
       'fuvest': 'Fuvest',
       'enem': 'Enem',
-      'others': 'Outros'
+      'outros': 'Outros'
     }
     const backendCategory = categoryMap[categoryParam] || categoryParam
     const data = await api.questions.getAll(backendCategory)
     
     if (data && data.length > 0) {
-      // Shuffle todas as questões
       allQuestions.value = data.sort(() => Math.random() - 0.5)
-      
-      // Priorizar questões não respondidas
       if (unansweredQuestions.value.length > 0) {
         viewMode.value = 'unanswered'
         currentQuestionIndex.value = 0
@@ -446,16 +460,12 @@ async function loadQuestions(forceRefresh = false) {
         viewMode.value = 'answered'
         currentQuestionIndex.value = 0
       }
-      
       resetQuestionState()
-      console.log(`[QUIZ] Loaded ${data.length} question(s) - ${unansweredQuestions.value.length} unanswered, ${answeredQuestions.value.length} answered`)
     } else {
       allQuestions.value = []
-      console.log('[QUIZ] No questions available')
     }
   } catch (err: any) {
     error.value = err.message || 'Erro ao carregar questões'
-    console.error('Error loading questions:', err)
   } finally {
     loading.value = false
   }
@@ -466,15 +476,25 @@ function resetQuestionState() {
   answered.value = false
   isCorrect.value = false
   correctAnswer.value = ''
+  
+  // Força o vídeo anterior a pausar usando a API
+  if (youtubeIframe.value && isPlaying.value) {
+    youtubeIframe.value.contentWindow?.postMessage(
+      JSON.stringify({ event: 'command', func: 'pauseVideo', args: [] }), 
+      '*'
+    )
+  }
+  
   isPlaying.value = false
   audioProgress.value = 0
+  if (progressInterval) clearInterval(progressInterval)
+  
   alreadyAnswered.value = false
   previousResult.value = null
   pointsEarned.value = false
   pointsValue.value = 0
-  displayedQuestion.value = null // Limpar questão exibida ao resetar
+  displayedQuestion.value = null 
   
-  // Verificar se a questão atual já foi respondida
   if (currentQuestion.value && typeof currentQuestion.value === 'object' && currentQuestion.value !== null) {
     if (currentQuestion.value.already_answered) {
       alreadyAnswered.value = true
@@ -483,97 +503,50 @@ function resetQuestionState() {
         : null
     }
   }
-  
-  if (audioElement.value) {
-    audioElement.value.pause()
-    audioElement.value.currentTime = 0
-    // Recarregar o áudio para garantir que está pronto
-    audioElement.value.load()
-  }
 }
 
-async function togglePlay() {
-  if (!audioElement.value || !currentQuestion.value?.music_drive_url) return
-  
-  if (isPlaying.value) {
-    audioElement.value.pause()
-    isPlaying.value = false
-  } else {
-    try {
-      // Tentar tocar o áudio
-      await audioElement.value.play()
-      isPlaying.value = true
-    } catch (error: any) {
-      console.error('Erro ao tocar áudio:', error)
-      // Se houver erro, pode ser problema de CORS ou formato
-      // Tentar carregar novamente
-      if (audioElement.value) {
-        audioElement.value.load()
-        try {
-          await audioElement.value.play()
-          isPlaying.value = true
-        } catch (retryError) {
-          console.error('Erro ao tocar áudio após retry:', retryError)
-          alert('Não foi possível reproduzir o áudio. Verifique se o arquivo está acessível publicamente no Google Drive.')
-        }
-      }
-    }
-  }
-}
-
-function updateAudioProgress() {
-  if (!audioElement.value) return
-  const progress = (audioElement.value.currentTime / audioElement.value.duration) * 100
-  audioProgress.value = isNaN(progress) ? 0 : progress
-}
-
-function onAudioEnded() {
-  isPlaying.value = false
-  audioProgress.value = 0
-}
-
-function onAudioLoaded() {
-  // Audio loaded successfully
-  if (audioElement.value) {
-    const duration = audioElement.value.duration
-    console.log('Áudio carregado com sucesso:', {
-      url: currentQuestion.value?.music_drive_url,
-      duration: duration,
-      durationFormatted: `${Math.floor(duration / 60)}:${Math.floor(duration % 60).toString().padStart(2, '0')}`
-    })
-    // Resetar progresso quando novo áudio é carregado
+function playYoutube() {
+  if (youtubeVideoId.value && youtubeIframe.value) {
+    isPlaying.value = true
+    
+    // Grito Ninja para a API do YouTube: "Toca agora!"
+    youtubeIframe.value.contentWindow?.postMessage(
+      JSON.stringify({ event: 'command', func: 'playVideo', args: [] }), 
+      '*'
+    )
+    
     audioProgress.value = 0
-  }
-}
-
-function getAudioUrl(driveUrl: string | null | undefined): string {
-  if (!driveUrl) return ''
-  
-  // Se já é uma URL do proxy, retornar como está
-  if (driveUrl.includes('/api/audio/proxy')) {
-    // Se for URL relativa, adicionar base URL
-    if (driveUrl.startsWith('/')) {
-      return `${API_BASE_URL.replace('/api', '')}${driveUrl}`
+    const start = parseInt(youtubeStartTime.value) || 0
+    const end = parseInt(youtubeEndTime.value) || 0
+    
+    if (end > start) {
+      audioDuration.value = end - start
+      const intervalMs = 100 
+      const step = (100 / (audioDuration.value * 1000)) * intervalMs
+      
+      clearInterval(progressInterval)
+      
+      // O SEGREDO AQUI: Espera 1 segundo (1000ms) para o buffer antes de mover a barra
+      setTimeout(() => {
+        // Só começa a contar se a música ainda estiver com status de tocando
+        if (isPlaying.value) {
+          progressInterval = setInterval(() => {
+            audioProgress.value += step
+            if (audioProgress.value >= 100) {
+              audioProgress.value = 100
+              isPlaying.value = false 
+              // Pausa quando a barra acaba
+              youtubeIframe.value?.contentWindow?.postMessage(
+                JSON.stringify({ event: 'command', func: 'pauseVideo', args: [] }), 
+                '*'
+              )
+              clearInterval(progressInterval)
+            }
+          }, intervalMs)
+        }
+      }, 1000) // <- Aqui está o 1 segundo de "gordura"
     }
-    return driveUrl
   }
-  
-  // Se for URL do Google Drive, extrair file_id e usar proxy
-  const fileIdMatch = driveUrl.match(/[\/=]([a-zA-Z0-9_-]{20,})/)
-  if (fileIdMatch) {
-    const fileId = fileIdMatch[1]
-    return `${API_BASE_URL.replace('/api', '')}/api/audio/proxy?id=${fileId}`
-  }
-  
-  // Fallback: retornar URL original
-  return driveUrl
-}
-
-function onAudioError(event: any) {
-  console.error('Erro ao carregar áudio:', event)
-  console.error('URL do áudio:', currentQuestion.value?.music_drive_url)
-  console.error('URL processada:', getAudioUrl(currentQuestion.value?.music_drive_url))
-  alert('Erro ao carregar o áudio. Verifique se o arquivo está compartilhado publicamente no Google Drive.')
 }
 
 function selectOption(index: number) {
@@ -600,10 +573,7 @@ function triggerConfetti() {
 
   const interval = setInterval(function() {
     const timeLeft = animationEnd - Date.now()
-
-    if (timeLeft <= 0) {
-      return clearInterval(interval)
-    }
+    if (timeLeft <= 0) return clearInterval(interval)
 
     const particleCount = 50 * (timeLeft / duration)
     
@@ -624,7 +594,6 @@ function triggerConfetti() {
 
 async function confirmAnswer() {
   if (selectedOption.value === null || !currentQuestion.value) return
-  
   const selectedLabel = questionOptions.value[selectedOption.value].label
   
   try {
@@ -637,23 +606,17 @@ async function confirmAnswer() {
     pointsEarned.value = result.points_earned || false
     pointsValue.value = result.points || 0
     
-    // Manter referência à questão atual sendo exibida ANTES de atualizar already_answered
-    // Isso garante que mesmo que a questão seja movida para outra lista, ela continue sendo exibida
     if (!displayedQuestion.value && currentQuestion.value) {
       displayedQuestion.value = { ...currentQuestion.value }
     }
-    
-    // Atualizar displayedQuestion com o estado atualizado
     if (displayedQuestion.value) {
       displayedQuestion.value.already_answered = true
       displayedQuestion.value.previous_result = previousResult.value
     }
     
-    // Atualizar estado da questão na lista completa
     const currentQ = displayedQuestion.value || currentQuestion.value
     if (currentQ && typeof currentQ === 'object' && currentQ !== null) {
       try {
-        // Encontrar a questão na lista completa e atualizar
         const questionId = currentQ.id
         if (questionId) {
           const questionInAllList = allQuestions.value.find(q => q && q.id === questionId)
@@ -667,27 +630,17 @@ async function confirmAnswer() {
               }
               questionInAllList.already_answered = true
               questionInAllList.previous_result = previousResult.value
-            } catch (err) {
-              console.error('Erro ao atualizar questão na lista:', err)
-            }
+            } catch (err) {}
           }
         }
-      } catch (err) {
-        console.error('Erro ao atualizar estado da questão:', err)
-      }
-      
-      // Não mover automaticamente - o usuário deve clicar em "Próxima Questão" manualmente
+      } catch (err) {}
     }
     
-    // Só mostrar confetti se acertou E ganhou pontos (primeira tentativa)
     if (isCorrect.value && pointsEarned.value) {
-      setTimeout(() => {
-        triggerConfetti()
-      }, 300)
+      setTimeout(() => triggerConfetti(), 300)
     }
   } catch (err: any) {
     error.value = err.message || 'Erro ao verificar resposta'
-    console.error('Error checking answer:', err)
   }
 }
 
@@ -696,7 +649,6 @@ function nextQuestion() {
     currentQuestionIndex.value++
     resetQuestionState()
   } else if (viewMode.value === 'unanswered' && answeredQuestions.value.length > 0) {
-    // Se acabaram as questões não respondidas e há questões respondidas, mudar para respondidas
     viewMode.value = 'answered'
     currentQuestionIndex.value = 0
     resetQuestionState()
@@ -724,17 +676,19 @@ function goToHome() {
   router.push('/')
 }
 
-// Lifecycle
 onMounted(() => {
-  // Carregar questões quando o componente é montado
-  // Se o usuário acabou de fazer login, as questões já foram sincronizadas no backend
-  loadQuestions(true) // forceRefresh = true para garantir que pega questões atualizadas
+  loadQuestions(true) 
 })
 
 onUnmounted(() => {
-  if (audioElement.value) {
-    audioElement.value.pause()
+  isPlaying.value = false 
+  if (youtubeIframe.value) {
+    youtubeIframe.value.contentWindow?.postMessage(
+      JSON.stringify({ event: 'command', func: 'pauseVideo', args: [] }), 
+      '*'
+    )
   }
+  if (progressInterval) clearInterval(progressInterval)
 })
 </script>
 
@@ -945,6 +899,8 @@ onUnmounted(() => {
   border-radius: var(--border-radius-md);
   border: 2px solid var(--gray-light);
   margin-bottom: 12px;
+  position: relative;
+  overflow: hidden;
 }
 
 /* Years Info */
@@ -1051,6 +1007,7 @@ onUnmounted(() => {
   transition: all var(--transition-base);
   box-shadow: var(--shadow-md);
   flex-shrink: 0;
+  z-index: 10; /* Mantém o botão acima do iframe invisível */
 }
 
 .quiz__play-btn:active {
@@ -1068,6 +1025,7 @@ onUnmounted(() => {
 .quiz__audio-info {
   flex: 1;
   min-width: 0;
+  z-index: 10;
 }
 
 .quiz__audio-title {
@@ -1090,7 +1048,6 @@ onUnmounted(() => {
   background: var(--green-primary);
   border-radius: var(--border-radius-full);
   transition: width 0.1s linear;
-  /* Removida animação CSS - o progresso é controlado pelo JavaScript baseado no tempo real do áudio */
 }
 
 .quiz__lyrics {

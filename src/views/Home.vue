@@ -3,8 +3,8 @@
     <div class="home__container">
       <div class="home__header">
         <div class="home__header-content">
-          <h1 class="home__title">Quiz Musical</h1>
-          <p class="home__subtitle">Prepare-se para o ENEM com música</p>
+          <h1 class="home__title">ProvaPop!</h1>
+          <p class="home__subtitle">Alcance sua nota mais alta!</p>
         </div>
         <div class="home__header-actions">
           <button class="home__profile-btn" @click="goToProfile" title="Meu Perfil">

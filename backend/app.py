@@ -41,7 +41,16 @@ class User(db.Model):
     email = db.Column(db.String(100), nullable=False, unique=True)
     password_hash = db.Column(db.String(255), nullable=False)
     total_score = db.Column(db.Integer, default=0, nullable=False)  # Pontuação total do usuário
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    
+    # NOVAS COLUNAS: Radar de Engajamento e Ofensivas
+    last_login = db.Column(db.DateTime, nullable=True)
+    total_play_time = db.Column(db.Integer, default=0)  # Tempo em segundos
+    current_streak = db.Column(db.Integer, default=0)   # Dias seguidos jogando
+    last_play_date = db.Column(db.Date, nullable=True)  # Data da última jogada para calcular a ofensiva
+    # NOVAS COLUNAS: Recuperacao de Senha
+    reset_token = db.Column(db.String(100), nullable=True, unique=True)
+    reset_token_expiry = db.Column(db.DateTime, nullable=True)
     
     quizzes = db.relationship('QuizAttempt', backref='user', lazy=True)
     
@@ -72,7 +81,10 @@ class User(db.Model):
             'id': self.id,
             'nickname': self.nickname,
             'total_score': self.total_score,  # Garantir que sempre seja >= 0
-            'created_at': self.created_at.isoformat()
+            'created_at': self.created_at.isoformat(),
+            'last_login': self.last_login.isoformat() if self.last_login else None,
+            'total_play_time': self.total_play_time,
+            'current_streak': self.current_streak
         }
         if include_email:
             data['email'] = self.email
@@ -103,7 +115,7 @@ class Question(db.Model):
     comment = db.Column(db.Text, nullable=True)  # Comentário/Dica
     curiosity = db.Column(db.Text, nullable=True)  # Curiosidade
     category = db.Column(db.String(20), nullable=True)  # Categoria: Unicamp, Fuvest, Enem, Outros
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=datetime.now)
     
     def to_dict(self):
         return {
@@ -175,7 +187,7 @@ class QuizAttempt(db.Model):
     selected_answer = db.Column(db.String(1), nullable=False)
     is_correct = db.Column(db.Boolean, nullable=False)
     points = db.Column(db.Integer, nullable=False)  # Pontos ganhos ou perdidos nesta tentativa (+100 ou -35)
-    answered_at = db.Column(db.DateTime, default=datetime.utcnow)
+    answered_at = db.Column(db.DateTime, default=datetime.now)
     
     question = db.relationship('Question', backref='attempts')
 
@@ -386,6 +398,19 @@ def check_answer(question_id):
         # Atualizar pontuação total do usuário (garantindo que nunca fique negativa)
         user.update_score(points)
         
+        # Atualizar tempo de jogo (usando o tempo do front, ou 15 segundos padrão)
+        time_spent = data.get('time_spent', 15)
+        user.total_play_time = (user.total_play_time or 0) + time_spent
+        
+        # Atualizar Ofensiva (Streak)
+        hoje = datetime.now().date()
+        if user.last_play_date != hoje:
+            if user.last_play_date == hoje - timedelta(days=1):
+                user.current_streak = (user.current_streak or 0) + 1
+            else:
+                user.current_streak = 1
+            user.last_play_date = hoje
+        
         points_earned = True
         
         # Salvar a tentativa apenas se for a primeira vez
@@ -445,6 +470,10 @@ def register_user():
     db.session.add(user)
     db.session.commit()
     
+    # Registrar último login
+    user.last_login = datetime.now()
+    db.session.commit()
+
     from auth import generate_token
     token = generate_token(user.id, app.config['SECRET_KEY'], expires_in=3600 * 24)
     
@@ -486,11 +515,15 @@ def login_user():
     # Isso será feito em background após o login ser confirmado
     
     if not user:
-        return jsonify({'error': 'Invalid credentials'}), 401
+        return jsonify({'error': 'Senha Incorreta!'}), 401
     
     if not user.check_password(data['password']):
-        return jsonify({'error': 'Invalid credentials'}), 401
+        return jsonify({'error': 'Senha Incorreta!'}), 401
     
+    # Registrar último login
+    user.last_login = datetime.now()
+    db.session.commit()
+
     from auth import generate_token
     token = generate_token(user.id, app.config['SECRET_KEY'], expires_in=3600 * 24)
     
@@ -599,6 +632,19 @@ def save_attempt():
     # Atualizar pontuação total do usuário (garantindo que nunca fique negativa)
     user.update_score(points)
     
+    # Atualizar tempo de jogo (usando o tempo do front, ou 15 segundos padrão)
+    time_spent = data.get('time_spent', 15)
+    user.total_play_time = (user.total_play_time or 0) + time_spent
+    
+    # Atualizar Ofensiva (Streak)
+    hoje = datetime.now().date()
+    if user.last_play_date != hoje:
+        if user.last_play_date == hoje - timedelta(days=1):
+            user.current_streak = (user.current_streak or 0) + 1
+        else:
+            user.current_streak = 1
+        user.last_play_date = hoje
+    
     attempt = QuizAttempt(
         user_id=user.id,
         question_id=data['question_id'],
@@ -657,9 +703,9 @@ def get_ranking():
     # Calcular data de corte baseada no período
     cutoff_date = None
     if period == 'week':
-        cutoff_date = datetime.utcnow() - timedelta(days=7)
+        cutoff_date = datetime.now() - timedelta(days=7)
     elif period == 'month':
-        cutoff_date = datetime.utcnow() - timedelta(days=30)
+        cutoff_date = datetime.now() - timedelta(days=30)
     
     users = User.query.all()
     ranking = []
@@ -895,7 +941,7 @@ def proxy_audio():
                 'Content-Type': content_type,
                 'Accept-Ranges': 'bytes',
                 'Cache-Control': 'public, max-age=3600',
-                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Origin': 'http://localhost:5173',
                 'Access-Control-Allow-Methods': 'GET',
                 'Access-Control-Allow-Headers': 'Content-Type'
             }
@@ -1056,3 +1102,94 @@ if __name__ == '__main__':
     # Usar debug apenas se FLASK_DEBUG estiver ativado
     debug_mode = app.config.get('FLASK_DEBUG', False)
     app.run(debug=debug_mode, host='0.0.0.0', port=5000)
+
+# --- ROTAS DE RECUPERAÇÃO DE SENHA ---
+import os
+import secrets
+import smtplib
+from datetime import datetime, timedelta
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from werkzeug.security import generate_password_hash
+from flask import request, jsonify
+
+@app.route('/api/auth/forgot-password', methods=['POST'])
+def forgot_password():
+    data = request.get_json()
+    email = data.get('email')
+    
+    if not email:
+        return jsonify({'message': 'E-mail é obrigatório'}), 400
+        
+    user = User.query.filter_by(email=email).first()
+    if not user:
+        return jsonify({'message': 'Se o e-mail estiver cadastrado, você receberá um link de recuperação.'}), 200
+        
+    token = secrets.token_urlsafe(32)
+    user.reset_token = token
+    user.reset_token_expiry = datetime.now() + timedelta(hours=1)
+    db.session.commit()
+    
+    sender_email = "play@provapop.com.br"
+    sender_password = os.getenv("ZOHO_APP_PASSWORD") # Lendo do arquivo .env com segurança!
+    
+    if not sender_password:
+        print("ERRO GRAVE: Senha ZOHO_APP_PASSWORD não encontrada no .env!")
+        return jsonify({'message': 'Erro interno do servidor. Contate o suporte.'}), 500
+    
+    msg = MIMEMultipart('alternative')
+    msg['Subject'] = "Recuperação de Senha - ProvaPop!"
+    msg['From'] = f"ProvaPop! <{sender_email}>"
+    msg['To'] = email
+    
+    reset_link = f"https://play.provapop.com.br/nova-senha?token={token}"
+    
+    html_content = f"""
+    <html>
+      <body style="font-family: Arial, sans-serif; color: #333;">
+        <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+            <h2>Olá, {user.nickname}! 🎮</h2>
+            <p>Recebemos um pedido para redefinir a senha da sua conta no <strong>ProvaPop!</strong>.</p>
+            <p>Para criar uma nova senha, clique no botão abaixo (este link expira em 1 hora):</p>
+            <a href="{reset_link}" style="display: inline-block; padding: 10px 20px; background-color: #4CAF50; color: white; text-decoration: none; border-radius: 5px; font-weight: bold;">Redefinir Minha Senha</a>
+            <p style="margin-top: 30px; font-size: 12px; color: #777;">Se você não solicitou esta alteração, pode ignorar este e-mail tranquilamente. Sua senha atual continuará funcionando.</p>
+            <hr style="border: none; border-top: 1px solid #eee; margin-top: 30px;">
+            <p style="font-size: 12px; color: #aaa;">Equipe ProvaPop!</p>
+        </div>
+      </body>
+    </html>
+    """
+    msg.attach(MIMEText(html_content, 'html'))
+    
+    try:
+        with smtplib.SMTP_SSL("smtp.zoho.com", 465) as server:
+            server.login(sender_email, sender_password)
+            server.sendmail(sender_email, email, msg.as_string())
+            
+    except Exception as e:
+        print(f"Erro ao enviar e-mail: {e}")
+        return jsonify({'message': 'Erro ao tentar enviar o e-mail. Tente novamente mais tarde.'}), 500
+        
+    return jsonify({'message': 'Se o e-mail estiver cadastrado, você receberá um link de recuperação.'}), 200
+
+@app.route('/api/auth/reset-password', methods=['POST'])
+def reset_password():
+    data = request.get_json()
+    token = data.get('token')
+    new_password = data.get('new_password')
+    
+    if not token or not new_password:
+        return jsonify({'message': 'Token e nova senha são obrigatórios'}), 400
+        
+    user = User.query.filter_by(reset_token=token).first()
+    
+    if not user or not user.reset_token_expiry or user.reset_token_expiry < datetime.now():
+        return jsonify({'message': 'Link inválido ou expirado. Por favor, solicite a recuperação novamente.'}), 400
+        
+    user.password_hash = generate_password_hash(new_password)
+    user.reset_token = None
+    user.reset_token_expiry = None
+    db.session.commit()
+    
+    return jsonify({'message': 'Senha redefinida com sucesso! Você já pode voltar a jogar.'}), 200
+

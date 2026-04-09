@@ -430,13 +430,13 @@ def read_questions_from_sheets(max_retries=3, retry_delay=10):
             
             # Mapear índices das colunas
             col_map = {}
-            expected_cols = ['ID', 'Autor', 'Titulo', 'Trecho_Letra', 'Enunciado', 'A', 'B', 'C', 'D', 'E', 'Alternativa_Correta', 'Musica_Drive', 'Ano_Lancamento', 'Ano_Prova', 'Comentario', 'Curiosidade', 'Categoria']
+            expected_cols = ['ID', 'Autor', 'Titulo', 'Trecho_Letra', 'Enunciado', 'A', 'B', 'C', 'D', 'E', 'Alternativa_Correta', 'Musica_Drive', 'Ano_Lancamento', 'Ano_Prova', 'Comentario', 'Curiosidade', 'Categoria', 'Creditos']
             for col in expected_cols:
                 try:
                     col_map[col] = headers.index(col)
                 except ValueError:
                     # Colunas opcionais (Ano_Lancamento, Ano_Prova, Comentario, Curiosidade, Categoria) não são obrigatórias
-                    if col in ['Ano_Lancamento', 'Ano_Prova', 'Comentario', 'Curiosidade', 'Categoria']:
+                    if col in ['Ano_Lancamento', 'Ano_Prova', 'Comentario', 'Curiosidade', 'Categoria', 'Creditos']:
                         app.logger.warning(f'Optional column "{col}" not found in sheet headers, will use empty value')
                         col_map[col] = None
                     else:
@@ -481,6 +481,7 @@ def read_questions_from_sheets(max_retries=3, retry_delay=10):
                     
                     comment = row[col_map['Comentario']].strip() if col_map.get('Comentario') is not None and col_map['Comentario'] < len(row) and row[col_map['Comentario']] else ''
                     curiosity = row[col_map['Curiosidade']].strip() if col_map.get('Curiosidade') is not None and col_map['Curiosidade'] < len(row) and row[col_map['Curiosidade']] else ''
+                    credits = row[col_map['Creditos']].strip() if col_map.get('Creditos') is not None and col_map['Creditos'] < len(row) and row[col_map['Creditos']] else ''
                     
                     # Categoria (deve ser uma das 4 opções válidas)
                     category_raw = row[col_map['Categoria']].strip() if col_map.get('Categoria') is not None and col_map['Categoria'] < len(row) and row[col_map['Categoria']] else ''
@@ -565,7 +566,8 @@ def read_questions_from_sheets(max_retries=3, retry_delay=10):
                         'enem_year': enem_year,
                         'comment': comment,
                         'curiosity': curiosity,
-                        'category': category
+                        'category': category,
+                        'credits': credits
                     }
                     
                     questions.append(question_data)
@@ -820,7 +822,8 @@ def sync_questions_from_sheets():
                     str(existing_q.enem_year or '') != str(q_data.get('enem_year') or '') or
                     (existing_q.comment or '') != (q_data.get('comment') or '') or
                     (existing_q.curiosity or '') != (q_data.get('curiosity') or '') or
-                    (existing_q.category or '') != (q_data.get('category') or '')):
+                    (existing_q.category or '') != (q_data.get('category') or '') or
+                    (existing_q.credits or '') != (q_data.get('credits') or '')):  # <--- COMPARAÇÃO DE CRÉDITOS
                     needs_update = True
                 
                 if needs_update:
@@ -842,6 +845,7 @@ def sync_questions_from_sheets():
                         existing_q.comment = q_data.get('comment')
                         existing_q.curiosity = q_data.get('curiosity')
                         existing_q.category = q_data.get('category')
+                        existing_q.credits = q_data.get('credits')  # <--- ATUALIZANDO CRÉDITOS
                         
                         db_instance.session.add(existing_q)
                         updated_count += 1
@@ -878,7 +882,8 @@ def sync_questions_from_sheets():
                     enem_year=q_data.get('enem_year'),
                     comment=q_data.get('comment'),
                     curiosity=q_data.get('curiosity'),
-                    category=q_data.get('category')
+                    category=q_data.get('category'),
+                    credits=q_data.get('credits')  # <--- INSERINDO CRÉDITOS NA NOVA
                 )
                 
                 db_instance.session.add(new_question)
@@ -911,6 +916,7 @@ def sync_questions_from_sheets():
                             existing_q.comment = q_data.get('comment')
                             existing_q.curiosity = q_data.get('curiosity')
                             existing_q.category = q_data.get('category')
+                            existing_q.credits = q_data.get('credits') # <--- AQUI TAMBÉM
                             
                             db_instance.session.add(existing_q)
                             updated_count += 1
@@ -945,6 +951,7 @@ def sync_questions_from_sheets():
                         existing_q.comment = q_data.get('comment')
                         existing_q.curiosity = q_data.get('curiosity')
                         existing_q.category = q_data.get('category')
+                        existing_q.credits = q_data.get('credits') # <--- E AQUI TAMBÉM
                         
                         db_instance.session.add(existing_q)
                         updated_count += 1

@@ -5,7 +5,7 @@
         <div class="profile__content">
           <div class="profile__header">
             <button class="profile__back-btn" @click="goBack" title="Voltar">
-              <font-awesome-icon icon="arrow-left"></font-awesome-icon>
+              <font-awesome-icon icon="arrow-left" />
             </button>
             <div class="profile__header-content">
               <h1 class="profile__title">Meu Perfil</h1>
@@ -14,17 +14,15 @@
           </div>
 
           <Card variant="elevated" class="profile__card">
-            
-            <!-- AQUI ENTRA A SUA LOGO NOVA! -->
             <div class="profile__avatar-section">
               <div class="profile__avatar">
-                <img src="@/assets/avatar-default.png" alt="Avatar VIP" class="profile__avatar-img" />
+                <font-awesome-icon icon="user" class="profile__avatar-icon" />
               </div>
             </div>
 
             <div class="profile__info-section">
               <div class="profile__info-item">
-                <font-awesome-icon icon="user" class="profile__info-icon"></font-awesome-icon>
+                <font-awesome-icon icon="user" class="profile__info-icon" />
                 <div class="profile__info-content">
                   <!-- Alterado para Nome Artístico -->
                   <div class="profile__info-label">Nome Artístico</div>
@@ -34,19 +32,19 @@
             </div>
 
             <div v-if="error" class="profile__message profile__message--error">
-              <font-awesome-icon icon="exclamation-circle"></font-awesome-icon>
+              <font-awesome-icon icon="exclamation-circle" />
               {{ error }}
             </div>
 
             <div v-if="success" class="profile__message profile__message--success">
-              <font-awesome-icon icon="check-circle"></font-awesome-icon>
+              <font-awesome-icon icon="check-circle" />
               {{ success }}
             </div>
 
             <form @submit.prevent="handleSave" class="profile__form">
               <div class="profile__field">
                 <label class="profile__label">
-                  <font-awesome-icon icon="envelope" class="profile__label-icon"></font-awesome-icon>
+                  <font-awesome-icon icon="envelope" class="profile__label-icon" />
                   E-mail
                 </label>
                 <input
@@ -61,7 +59,7 @@
 
               <div class="profile__field">
                 <label class="profile__label">
-                  <font-awesome-icon icon="lock" class="profile__label-icon"></font-awesome-icon>
+                  <font-awesome-icon icon="lock" class="profile__label-icon" />
                   Nova Senha Secreta
                 </label>
                 <div class="profile__password-wrapper">
@@ -77,7 +75,7 @@
                     class="profile__toggle-password"
                     @click="showPassword = !showPassword"
                   >
-                    <font-awesome-icon :icon="showPassword ? 'eye-slash' : 'eye'"></font-awesome-icon>
+                    <font-awesome-icon :icon="showPassword ? 'eye-slash' : 'eye'" />
                   </button>
                 </div>
                 <p class="profile__hint">Mínimo de 6 caracteres</p>
@@ -90,7 +88,7 @@
                   :disabled="loading || !hasChanges"
                   class="profile__save-btn"
                 >
-                  <font-awesome-icon v-if="loading" icon="circle-notch" class="profile__spinner"></font-awesome-icon>
+                  <font-awesome-icon v-if="loading" icon="circle-notch" class="profile__spinner" />
                   {{ loading ? 'Afinando...' : 'Salvar' }}
                 </button>
                 <button
@@ -109,7 +107,7 @@
             <!-- Título atualizado para "No Holofote" -->
             <h2 class="profile__stats-title">No Holofote</h2>
             <div v-if="loadingStats" class="profile__stats-loading">
-              <font-awesome-icon icon="circle-notch" class="profile__spinner"></font-awesome-icon>
+              <font-awesome-icon icon="circle-notch" class="profile__spinner" />
               Buscando dados...
             </div>
             <div v-else class="profile__stats-grid">
@@ -387,25 +385,21 @@ onMounted(async () => {
   position: relative;
 }
 
-/* O SEGREDO ESTÁ AQUI NESSE OVERFLOW: HIDDEN! */
 .profile__avatar {
   width: 100px;
   height: 100px;
   border-radius: 50%;
-  background: #ffffff;
+  background: linear-gradient(135deg, #8B1E3F 0%, #E25822 100%);
   display: flex;
   align-items: center;
   justify-content: center;
   box-shadow: 0 10px 25px rgba(226, 88, 34, 0.2);
   border: 4px solid #ffffff;
-  overflow: hidden; 
 }
 
-/* A IMAGEM PREENCHE TODO O CÍRCULO */
-.profile__avatar-img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
+.profile__avatar-icon {
+  font-size: 44px;
+  color: #ffffff;
 }
 
 .profile__info-section {
@@ -566,13 +560,14 @@ onMounted(async () => {
   margin-top: 12px;
 }
 
+/* Botão Salvar apenas na cor Laranja Terroso */
 .profile__save-btn {
   order: 1;
   width: 100%;
   padding: 16px;
   border: none;
   border-radius: 12px;
-  background: #c90d0df3;
+  background: #E25822;
   color: #ffffff;
   font-size: 16px;
   font-weight: 800;

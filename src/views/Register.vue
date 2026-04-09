@@ -2,39 +2,44 @@
   <div class="register">
     <Transition name="fade" appear>
       <div class="register__container">
+        
         <div class="register__header">
-          <h1 class="register__title">ProvaPoP</h1>
-          <p class="register__subtitle">Crie sua conta e comece a estudar</p>
+          <div class="register__logo-wrapper">
+            <img src="@/assets/logo_login.png" alt="ProvaPop! Logo" class="register__logo" />
+          </div>
+          <p class="register__subtitle">Sua jornada começa aqui...</p>
         </div>
 
         <Card variant="elevated" class="register__card">
+          <div class="register__welcome-text">
+            <h3>Crie seu Passe VIP</h3>
+          </div>
+
           <form @submit.prevent="handleRegister" class="register__form">
             <div class="register__field">
               <label class="register__label">
                 <font-awesome-icon icon="user" class="register__label-icon" />
-                Apelido
+                Como quer ser chamado?
               </label>
               <input
-                v-model="form.nickname"
+                v-model="form.name"
                 type="text"
                 class="register__input"
-                placeholder="Digite seu apelido"
+                placeholder="ex: Fernando"
                 required
-                maxlength="20"
               />
-              <p class="register__hint">Este nome será exibido no ranking</p>
             </div>
 
             <div class="register__field">
               <label class="register__label">
                 <font-awesome-icon icon="envelope" class="register__label-icon" />
-                Email
+                Seu E-mail
               </label>
               <input
                 v-model="form.email"
                 type="email"
                 class="register__input"
-                placeholder="Digite seu email"
+                placeholder="ex: futuro.calouro@email.com"
                 required
               />
             </div>
@@ -42,18 +47,15 @@
             <div class="register__field">
               <label class="register__label">
                 <font-awesome-icon icon="lock" class="register__label-icon" />
-                Senha
+                Crie uma Senha Secreta
               </label>
               <div class="register__password-wrapper">
                 <input
                   v-model="form.password"
                   :type="showPassword ? 'text' : 'password'"
                   class="register__input"
-                  :class="{ 'register__input--error': passwordError }"
-                  placeholder="Digite sua senha"
+                  placeholder="••••••••"
                   required
-                  minlength="6"
-                  @input="validatePassword"
                 />
                 <button
                   type="button"
@@ -63,53 +65,27 @@
                   <font-awesome-icon :icon="showPassword ? 'eye-slash' : 'eye'" />
                 </button>
               </div>
-              <p v-if="passwordError" class="register__error">{{ passwordError }}</p>
             </div>
 
-            <div class="register__field">
-              <label class="register__label">
-                <font-awesome-icon icon="lock" class="register__label-icon" />
-                Confirmar Senha
-              </label>
-              <div class="register__password-wrapper">
-                <input
-                  v-model="form.confirmPassword"
-                  :type="showConfirmPassword ? 'text' : 'password'"
-                  class="register__input"
-                  :class="{ 'register__input--error': confirmPasswordError }"
-                  placeholder="Confirme sua senha"
-                  required
-                  @input="validateConfirmPassword"
-                />
-                <button
-                  type="button"
-                  class="register__toggle-password"
-                  @click="showConfirmPassword = !showConfirmPassword"
-                >
-                  <font-awesome-icon :icon="showConfirmPassword ? 'eye-slash' : 'eye'" />
-                </button>
-              </div>
-              <p v-if="confirmPasswordError" class="register__error">{{ confirmPasswordError }}</p>
-            </div>
-
-            <div v-if="authStore.error" class="register__error-message">
+            <div v-if="authStore.error" class="register__error">
+              <font-awesome-icon icon="exclamation-circle" />
               {{ authStore.error }}
             </div>
-            <Button
-              type="submit"
-              variant="primary"
-              size="lg"
-              full-width
-              :disabled="authStore.loading || !isFormValid"
-              class="register__submit"
-            >
-              <font-awesome-icon v-if="authStore.loading" icon="circle-notch" class="register__spinner" />
-              {{ authStore.loading ? 'Criando conta...' : 'Criar Conta' }}
-            </Button>
+
+            <div class="register__action">
+              <button
+                type="submit"
+                :disabled="authStore.loading"
+                class="register__submit-btn"
+              >
+                <font-awesome-icon v-if="authStore.loading" icon="circle-notch" class="register__spinner" />
+                {{ authStore.loading ? 'Preparando...' : 'Cadastrar!' }}
+              </button>
+            </div>
           </form>
 
           <div class="register__footer">
-            <p>Já tem uma conta? <a href="#" @click.prevent="goToLogin" class="register__link">Fazer login</a></p>
+            <p>Já tem ingresso? <a href="#" @click.prevent="goToLogin" class="register__link">Faça Login</a></p>
           </div>
         </Card>
       </div>
@@ -118,69 +94,33 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import Card from '@/components/Card.vue'
-import Button from '@/components/Button.vue'
 import { useAuthStore } from '@/stores/auth'
 
 const router = useRouter()
 const authStore = useAuthStore()
 
 const form = ref({
-  nickname: '',
+  name: '',
   email: '',
-  password: '',
-  confirmPassword: ''
+  password: ''
 })
 
 const showPassword = ref(false)
-const showConfirmPassword = ref(false)
-const passwordError = ref('')
-const confirmPasswordError = ref('')
-
-const isFormValid = computed(() => {
-  return form.value.nickname.trim() !== '' &&
-         form.value.email.trim() !== '' &&
-         form.value.password.length >= 6 &&
-         form.value.password === form.value.confirmPassword &&
-         passwordError.value === '' &&
-         confirmPasswordError.value === ''
-})
-
-function validatePassword() {
-  if (form.value.password.length > 0 && form.value.password.length < 6) {
-    passwordError.value = 'A senha deve ter no mínimo 6 caracteres'
-  } else {
-    passwordError.value = ''
-  }
-  validateConfirmPassword()
-}
-
-function validateConfirmPassword() {
-  if (form.value.confirmPassword.length > 0) {
-    if (form.value.password !== form.value.confirmPassword) {
-      confirmPasswordError.value = 'As senhas não coincidem'
-    } else {
-      confirmPasswordError.value = ''
-    }
-  } else {
-    confirmPasswordError.value = ''
-  }
-}
 
 async function handleRegister() {
-  if (isFormValid.value) {
-    try {
-      await authStore.register(form.value.nickname, form.value.email, form.value.password)
-    } catch (error) {
-      console.error('Register error:', error)
-    }
+  try {
+    await authStore.register(form.value.name, form.value.email, form.value.password)
+    // A store de auth normalmente redireciona após o sucesso
+  } catch (error) {
+    console.error('Registration error:', error)
   }
 }
 
 function goToLogin() {
-  router.push('/entrar')
+  router.push('/login')
 }
 </script>
 
@@ -190,14 +130,15 @@ function goToLogin() {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 16px;
-  background: var(--white);
-  border: 1px solid var(--green-pastel);
+  padding: 20px;
+  background-color: #ffffff;
+  background-image: linear-gradient(180deg, #ffffff 0%, #ffffff 40%, #fcf2ee 70%, #ebd2cb 100%);
 }
 
 .register__container {
   width: 100%;
-  max-width: 100%;
+  max-width: 420px;
+  z-index: 10;
 }
 
 .register__header {
@@ -205,24 +146,51 @@ function goToLogin() {
   margin-bottom: 24px;
 }
 
-.register__title {
-  font-size: 36px;
-  font-weight: 700;
-  margin: 0 0 8px 0;
-  background: linear-gradient(135deg, var(--green-primary) 0%, var(--yellow-primary) 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+.register__logo-wrapper {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 12px;
+}
+
+.register__logo {
+  max-width: 240px;
+  height: auto;
+  animation: float 6s ease-in-out infinite;
+}
+
+@keyframes float {
+  0% { transform: translateY(0px); }
+  50% { transform: translateY(-8px); }
+  100% { transform: translateY(0px); }
 }
 
 .register__subtitle {
-  font-size: 14px;
-  color: var(--black-soft);
+  font-size: 18px;
+  font-weight: 600;
+  color: #8B1E3F;
+  margin: 0;
+  letter-spacing: -0.3px;
+}
+
+.register__welcome-text {
+  text-align: center;
+  margin-bottom: 28px;
+}
+
+.register__welcome-text h3 {
+  font-size: 22px;
+  font-weight: 800;
+  color: #8B1E3F;
   margin: 0;
 }
 
 .register__card {
-  padding: 24px;
+  padding: 32px 24px;
+  border-radius: 24px;
+  box-shadow: 0 20px 40px rgba(226, 88, 34, 0.08), 0 1px 3px rgba(0, 0, 0, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.98);
+  backdrop-filter: blur(10px);
 }
 
 .register__form {
@@ -243,43 +211,36 @@ function goToLogin() {
   gap: 8px;
   font-size: 14px;
   font-weight: 600;
-  color: var(--black-soft);
+  color: #5a4a46;
 }
 
 .register__label-icon {
-  font-size: 14px;
-  color: var(--green-primary);
+  font-size: 15px;
+  color: #E25822; 
 }
 
 .register__input {
   width: 100%;
-  padding: 12px 16px;
+  padding: 14px 16px;
   font-size: 15px;
-  border: 2px solid var(--gray-light);
-  border-radius: var(--border-radius-full);
-  background: var(--white);
-  color: var(--black-soft);
-  transition: all var(--transition-base);
+  border: 2px solid #e8dedc;
+  border-radius: 12px;
+  background: #ffffff;
+  color: #2d2422;
+  transition: all 0.3s ease;
   font-family: inherit;
   outline: none;
 }
 
 .register__input:focus {
-  border-color: var(--green-primary);
-  box-shadow: 0 0 0 3px var(--green-pastel);
-}
-
-.register__input--error {
-  border-color: var(--yellow-primary);
-}
-
-.register__input--error:focus {
-  border-color: var(--yellow-primary);
-  box-shadow: 0 0 0 3px var(--yellow-pastel);
+  border-color: #8B1E3F;
+  box-shadow: 0 0 0 4px rgba(139, 30, 63, 0.1);
+  transform: translateY(-1px);
 }
 
 .register__input::placeholder {
-  color: var(--gray);
+  color: #b5a9a7;
+  font-weight: 400;
 }
 
 .register__password-wrapper {
@@ -294,51 +255,75 @@ function goToLogin() {
 
 .register__toggle-password {
   position: absolute;
-  right: 16px;
+  right: 12px;
   background: none;
   border: none;
-  color: var(--gray-dark);
+  color: #b5a9a7;
   cursor: pointer;
-  padding: 4px;
+  padding: 8px;
+  border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: color var(--transition-base);
+  transition: all 0.3s ease;
 }
 
-.register__toggle-password:active {
-  color: var(--green-primary);
-}
-
-.register__hint {
-  font-size: 12px;
-  color: var(--gray-dark);
-  margin: 0;
-  padding-left: 22px;
+.register__toggle-password:hover {
+  color: #E25822;
+  background: rgba(226, 88, 34, 0.1);
 }
 
 .register__error {
-  font-size: 12px;
-  color: var(--yellow-dark);
-  margin: 0;
-  padding-left: 22px;
-  font-weight: 500;
-}
-
-.register__error-message {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   padding: 12px;
-  background: var(--yellow-pastel);
-  border: 2px solid var(--yellow-primary);
-  border-radius: var(--border-radius-md);
-  color: var(--yellow-dark);
+  background: #fdf2f2;
+  border: 1px solid #e27d72;
+  border-radius: 12px;
+  color: #d13d3d;
   font-size: 13px;
-  font-weight: 500;
-  margin-bottom: 8px;
-  text-align: center;
+  font-weight: 600;
+  margin-bottom: 4px;
 }
 
-.register__submit {
+.register__action {
   margin-top: 8px;
+}
+
+.register__submit-btn {
+  width: 100%;
+  padding: 16px;
+  border: none;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #8B1E3F 0%, #E25822 100%);
+  color: #ffffff;
+  font-size: 20px;
+  font-weight: 900;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 15px rgba(226, 88, 34, 0.2);
+}
+
+.register__submit-btn:hover:not(:disabled) {
+  transform: translateY(-3px) scale(1.01);
+  box-shadow: 0 10px 25px rgba(139, 30, 63, 0.3);
+}
+
+.register__submit-btn:active:not(:disabled) {
+  transform: translateY(0) scale(0.98);
+}
+
+.register__submit-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
 }
 
 .register__spinner {
@@ -346,38 +331,35 @@ function goToLogin() {
 }
 
 @keyframes spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
 .register__footer {
   text-align: center;
-  padding-top: 20px;
-  border-top: 1px solid var(--gray-light);
-  font-size: 13px;
-  color: var(--black-soft);
+  padding-top: 24px;
+  margin-top: 24px;
+  border-top: 1px solid #e8dedc;
+  font-size: 14px;
+  color: #5a4a46;
 }
 
 .register__link {
-  color: var(--green-primary);
+  color: #E25822;
   text-decoration: none;
-  font-weight: 600;
-  transition: color var(--transition-base);
-  cursor: pointer;
+  font-weight: 800;
+  transition: color 0.3s ease;
+  margin-left: 4px;
 }
 
-.register__link:active {
-  color: var(--green-dark);
+.register__link:hover {
+  color: #8B1E3F;
   text-decoration: underline;
 }
 
 .fade-enter-active,
 .fade-leave-active {
-  transition: opacity var(--transition-slow), transform var(--transition-slow);
+  transition: opacity 0.6s cubic-bezier(0.4, 0, 0.2, 1), transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .fade-enter-from {
@@ -391,51 +373,11 @@ function goToLogin() {
 }
 
 @media (min-width: 768px) {
-  .register {
-    padding: 24px;
-  }
-
-  .register__container {
-    max-width: 440px;
-  }
-
-  .register__header {
-    margin-bottom: 32px;
-  }
-
-  .register__title {
-    font-size: 48px;
-  }
-
-  .register__subtitle {
-    font-size: 16px;
-  }
-
   .register__card {
-    padding: 40px;
+    padding: 48px 40px;
   }
-
-  .register__form {
-    gap: 24px;
-  }
-
-  .register__input {
-    padding: 14px 16px;
-    font-size: 16px;
-  }
-
-  .register__toggle-password:hover {
-    color: var(--green-primary);
-  }
-
-  .register__footer {
-    padding-top: 24px;
-    font-size: 14px;
-  }
-
-  .register__link:hover {
-    color: var(--green-dark);
-    text-decoration: underline;
+  .register__logo {
+    max-width: 280px;
   }
 }
 </style>

@@ -14,13 +14,13 @@ const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
     {
-      path: '/entrar',
+      path: '/login', // 👈 Mudamos de /entrar para /login
       name: 'login',
       component: Login,
       meta: { requiresGuest: true }
     },
     {
-      path: '/cadastro',
+      path: '/register', // 👈 Mudamos de /cadastro para /register
       name: 'register',
       component: Register,
       meta: { requiresGuest: true }
@@ -44,7 +44,7 @@ const router = createRouter({
       meta: { requiresAuth: true }
     },
     {
-      path: '/categorias',
+      path: '/categorias', // 👈 Mantivemos igual, arquivo CategoryMenu.vue
       name: 'categories',
       component: CategoryMenu,
       meta: { requiresAuth: true }
@@ -61,7 +61,7 @@ const router = createRouter({
       redirect: '/categorias'
     },
     {
-      path: '/perfil',
+      path: '/profile', // 👈 Mudamos de /perfil para /profile
       name: 'profile',
       component: Profile,
       meta: { requiresAuth: true }
@@ -85,7 +85,7 @@ router.beforeEach(async (to, _from, next) => {
     
     const authenticated = await authStore.verifyAuth()
     if (!authenticated) {
-      return next('/entrar')
+      return next('/login') // 👈 Redirecionando para a nova rota correta
     }
     
     return next()

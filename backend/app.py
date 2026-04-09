@@ -98,7 +98,7 @@ class Question(db.Model):
     __tablename__ = 'questions'
     
     id = db.Column(db.Integer, primary_key=True)
-    external_id = db.Column(db.String(50), nullable=True, unique=True)  # ID da planilha Google Sheets
+    external_id = db.Column(db.String(50), nullable=True, unique=True)
     song_title = db.Column(db.String(200), nullable=False)
     artist = db.Column(db.String(200), nullable=False)
     lyrics = db.Column(db.Text, nullable=False)
@@ -109,12 +109,13 @@ class Question(db.Model):
     option_c = db.Column(db.Text, nullable=False)
     option_d = db.Column(db.Text, nullable=False)
     option_e = db.Column(db.Text, nullable=False)
-    music_drive_url = db.Column(db.String(500), nullable=True)  # URL do Drive para a música
-    composition_year = db.Column(db.Integer, nullable=True)  # Ano da Composição
-    enem_year = db.Column(db.Integer, nullable=True)  # Ano ENEM
-    comment = db.Column(db.Text, nullable=True)  # Comentário/Dica
-    curiosity = db.Column(db.Text, nullable=True)  # Curiosidade
-    category = db.Column(db.String(20), nullable=True)  # Categoria: Unicamp, Fuvest, Enem, Outros
+    music_drive_url = db.Column(db.String(500), nullable=True)
+    composition_year = db.Column(db.Integer, nullable=True)
+    enem_year = db.Column(db.Integer, nullable=True)
+    comment = db.Column(db.Text, nullable=True)
+    curiosity = db.Column(db.Text, nullable=True)
+    category = db.Column(db.String(20), nullable=True)
+    credits = db.Column(db.Text, nullable=True)  # <--- NOVA COLUNA AQUI
     created_at = db.Column(db.DateTime, default=datetime.now)
     
     def to_dict(self):
@@ -137,44 +138,28 @@ class Question(db.Model):
             'enem_year': self.enem_year,
             'comment': self.comment,
             'curiosity': self.curiosity,
-            'category': self.category
+            'category': self.category,
+            'credits': self.credits  # <--- E AQUI PARA ENVIAR PRO VUE
         }
     
     def get_direct_drive_url(self):
-        """
-        Converte um link do Google Drive para um link direto utilizável em players de áudio.
-        Suporta vários formatos de links do Drive.
-        
-        Para streaming de áudio HTML5, usa o formato uc?export=download que funciona
-        melhor quando o arquivo está compartilhado publicamente.
-        """
         if not self.music_drive_url:
             return None
-        
         url = self.music_drive_url.strip()
-        
-        # Padrões de links do Google Drive
         patterns = [
-            r'/file/d/([a-zA-Z0-9_-]+)',  # /file/d/FILE_ID/view ou /file/d/FILE_ID/edit
-            r'[?&]id=([a-zA-Z0-9_-]+)',  # ?id=FILE_ID ou &id=FILE_ID
-            r'/open\?id=([a-zA-Z0-9_-]+)',  # /open?id=FILE_ID
+            r'/file/d/([a-zA-Z0-9_-]+)',
+            r'[?&]id=([a-zA-Z0-9_-]+)',
+            r'/open\?id=([a-zA-Z0-9_-]+)',
         ]
-        
         import re
         file_id = None
-        
         for pattern in patterns:
             match = re.search(pattern, url)
             if match:
                 file_id = match.group(1)
                 break
-        
         if not file_id:
-            # Se não conseguir extrair o ID, retornar o link original
             return url
-        
-        # Retornar URL do proxy do backend (evita CORS)
-        # O backend fará o proxy para o Google Drive
         proxy_url = f'/api/audio/proxy?id={file_id}'
         return proxy_url
 
@@ -474,6 +459,10 @@ def register_user():
     user.last_login = datetime.now()
     db.session.commit()
 
+    # Registrar último login
+    user.last_login = datetime.now()
+    db.session.commit()
+
     from auth import generate_token
     token = generate_token(user.id, app.config['SECRET_KEY'], expires_in=3600 * 24)
     
@@ -520,6 +509,10 @@ def login_user():
     if not user.check_password(data['password']):
         return jsonify({'error': 'Senha Incorreta!'}), 401
     
+    # Registrar último login
+    user.last_login = datetime.now()
+    db.session.commit()
+
     # Registrar último login
     user.last_login = datetime.now()
     db.session.commit()

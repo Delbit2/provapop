@@ -196,9 +196,11 @@
               </div>
             </div>
 
-            <!-- 📝 CRÉDITOS DA CANÇÃO (FLUTUANTES) -->
+            <!-- 📝 CRÉDITOS DA CANÇÃO (FLUTUANTES PREMIUM) -->
             <div class="quiz__credits animate-slide-up" v-if="currentQuestion.credits">
-              <p>{{ currentQuestion.credits }}</p>
+              <div class="quiz__credits-pill">
+                {{ currentQuestion.credits }}
+              </div>
             </div>
 
             <!-- 🎯 ENUNCIADO -->
@@ -1146,20 +1148,30 @@ onUnmounted(() => {
   margin: 10px 0;
 }
 
-/* 📝 CRÉDITOS DA MÚSICA (A novidade!) */
+/* 📝 CRÉDITOS DA MÚSICA (Totalmente colado à direita) */
 .quiz__credits {
-  text-align: right;
-  padding: 0 16px;
+  display: flex;
+  justify-content: flex-end; /* Alinha flexível à direita */
+  padding: 0; /* Removido o padding lateral para encostar no card */
+  margin-top: -6px; /* Puxa um pouco para ficar juntinho da letra */
   margin-bottom: 24px;
-  opacity: 0.75;
+  position: relative;
+  z-index: 2;
 }
 
-.quiz__credits p {
-  font-size: 13px;
+.quiz__credits-pill {
+  font-size: 12px;
   font-style: italic;
   color: var(--text-muted);
-  margin: 0;
+  background: rgba(255, 250, 240, 0.85); 
+  backdrop-filter: blur(4px);
+  padding: 6px 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(226, 88, 34, 0.15);
+  box-shadow: 0 4px 10px rgba(163, 42, 82, 0.05);
   line-height: 1.5;
+  max-width: 80%;
+  text-align: right;
 }
 
 /* 🎯 ENUNCIADO */
@@ -1417,7 +1429,7 @@ onUnmounted(() => {
   .quiz__lyrics-text p { margin: 12px 0; }
   
   /* Créditos no desktop também aumentam de leve */
-  .quiz__credits p { font-size: 15px; }
+  .quiz__credits-pill { font-size: 14px; padding: 8px 18px; }
 
   .quiz__statement { padding: 32px; }
   .quiz__statement-text { font-size: 24px; } 

@@ -1,0 +1,22 @@
+name: Deploy ProvaPop para Hostinger
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Baixando o código do GitHub
+        uses: actions/checkout@v3
+
+      - name: Enviando arquivos para a VPS
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USERNAME }}
+          password: ${{ secrets.VPS_PASSWORD }}
+          source: "."
+          target: "/var/www/provapop"

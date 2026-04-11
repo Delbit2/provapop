@@ -171,7 +171,7 @@ const dynamicGreeting = computed(() => {
   }
 
   // Pega o primeiro nome do usuário, se existir. Se não, chama de 'Estudante'
-  const userName = authStore.user?.name ? authStore.user.name.split(' ')[0] : 'Estudante'
+  const userName = authStore.user?.nickname ? authStore.user.nickname.split(' ')[0] : 'Estudante'
   
   return `${greeting}, ${userName}! ✨`
 })

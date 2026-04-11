@@ -3,7 +3,7 @@ name: Deploy ProvaPop Fase 3
 on:
   push:
     branches:
-      - main # ATENÇÃO: Se a sua branch principal se chamar "master", mude aqui para master
+      - main
 
 jobs:
   build-and-deploy:
@@ -16,21 +16,21 @@ jobs:
     - name: 2. Preparar o ambiente Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '18' # Versão estável do Node (pode ser 20 se o seu projeto exigir)
+        node-version: '18'
 
-    - name: 3. Instalar dependências (Ler package.json)
+    - name: 3. Instalar dependências
       run: npm install
 
     - name: 4. Gerar a pasta dist (Build do Vue.js)
       run: npm run build
 
-    - name: 5. Enviar para o servidor VPS
+    - name: 5. Enviar para o servidor VPS via Senha
       uses: appleboy/scp-action@master
       with:
-        host: ${{ secrets.HOST }}
-        username: ${{ secrets.USERNAME }}
-        key: ${{ secrets.SSH_KEY }}
-        port: 22 # Ou ${{ secrets.PORT }} se você usar porta diferente
+        host: 76.13.162.112
+        username: root
+        password: ${{ secrets.VPS_PASSWORD }}
+        port: 22
         source: "dist/*"
         target: "/var/www/enem-brasil/dist/"
-        strip_components: 1 # Isso impede de criar uma pasta dist dentro da dist
+        strip_components: 1

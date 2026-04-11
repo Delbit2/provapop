@@ -1,17 +1,36 @@
-name: Deploy to Hostinger
+name: Deploy ProvaPop Fase 3
 
 on:
   push:
-    branches: [ main ] 
+    branches:
+      - main # ATENÇÃO: Se a sua branch principal se chamar "master", mude aqui para master
 
 jobs:
-  deploy:
+  build-and-deploy:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
-      
-      - name: Deploy to Hostinger VPS
-        uses: hostinger/deploy-on-vps@v2
-        with:
-          api-key: ${{ secrets.HOSTINGER_API_KEY }}
-          virtual-machine: ${{ vars.HOSTINGER_VM_ID }}
+    - name: 1. Pegar o código do GitHub
+      uses: actions/checkout@v4
+
+    - name: 2. Preparar o ambiente Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18' # Versão estável do Node (pode ser 20 se o seu projeto exigir)
+
+    - name: 3. Instalar dependências (Ler package.json)
+      run: npm install
+
+    - name: 4. Gerar a pasta dist (Build do Vue.js)
+      run: npm run build
+
+    - name: 5. Enviar para o servidor VPS
+      uses: appleboy/scp-action@master
+      with:
+        host: ${{ secrets.HOST }}
+        username: ${{ secrets.USERNAME }}
+        key: ${{ secrets.SSH_KEY }}
+        port: 22 # Ou ${{ secrets.PORT }} se você usar porta diferente
+        source: "dist/*"
+        target: "/var/www/enem-brasil/dist/"
+        strip_components: 1 # Isso impede de criar uma pasta dist dentro da dist

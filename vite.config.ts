@@ -4,10 +4,8 @@ import { VitePWA } from 'vite-plugin-pwa'
 import { fileURLToPath, URL } from 'node:url'
 
 export default defineConfig({
-  base: '/provapop/', // <--- Caminho base do GitHub Pages
-  build: {
-    outDir: 'docs',   // <--- Onde o bolo assado vai sair
-  },
+  base: '/', // <--- Alterado para a raiz
+  // build: { outDir: 'docs' } foi removido para usar o padrão 'dist'
   plugins: [
     vue(),
     VitePWA({
@@ -16,7 +14,7 @@ export default defineConfig({
         enabled: true
       },
       manifest: {
-        id: '/provapop/',
+        id: '/', // <--- Alterado para a raiz
         name: 'ProvaPoP',
         short_name: 'ProvaPoP',
         description: 'Webgame musical ProvaPoP',
@@ -24,7 +22,7 @@ export default defineConfig({
         theme_color: '#111827',
         background_color: '#111827',
         display: 'standalone',
-        start_url: '/provapop/',
+        start_url: '/', // <--- Alterado para a raiz
         icons: [
           {
             src: 'pwa-192x192.png',

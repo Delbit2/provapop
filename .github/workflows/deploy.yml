@@ -18,19 +18,30 @@ jobs:
       with:
         node-version: '18'
 
-    - name: 3. Instalar dependências
-      run: npm install
+    - name: 3. Instalar dependências e Gerar Build
+      run: |
+        npm install
+        npm run build
+        rm -rf node_modules 
 
-    - name: 4. Gerar o Build do Vue.js
-      run: npm run build
-
-    - name: 5. Enviar para o servidor VPS via Senha
+    - name: 4. Enviar TUDO para o servidor VPS (ProvaPop)
       uses: appleboy/scp-action@master
       with:
         host: 76.13.162.112
         username: root
         password: ${{ secrets.VPS_PASSWORD }}
         port: 22
-        source: "docs"
-        target: "/var/www/enem-brasil/dist/"
-        strip_components: 1
+        source: "."
+        target: "/var/www/provapop"
+
+    - name: 5. Ligar os Motores do Jogo (Docker)
+      uses: appleboy/ssh-action@master
+      with:
+        host: 76.13.162.112
+        username: root
+        password: ${{ secrets.VPS_PASSWORD }}
+        port: 22
+        script: |
+          cd /var/www/provapop
+          docker compose down || true
+          docker compose up -d --build

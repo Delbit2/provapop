@@ -21,11 +21,8 @@ jobs:
     - name: 3. Instalar dependências
       run: npm install
 
-    - name: 4. Gerar a pasta dist (Build do Vue.js)
+    - name: 4. Gerar o Build do Vue.js
       run: npm run build
-
-    - name: 4.5. Detetive - Ver o que foi gerado na pasta
-      run: ls -la
 
     - name: 5. Enviar para o servidor VPS via Senha
       uses: appleboy/scp-action@master
@@ -34,6 +31,6 @@ jobs:
         username: root
         password: ${{ secrets.VPS_PASSWORD }}
         port: 22
-        source: "dist"
+        source: "docs"
         target: "/var/www/enem-brasil/dist/"
         strip_components: 1

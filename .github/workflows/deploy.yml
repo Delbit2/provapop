@@ -1,4 +1,4 @@
-name: Deploy ProvaPop para Hostinger
+name: Deploy ProvaPop Fase 3
 
 on:
   push:
@@ -6,17 +6,31 @@ on:
       - main
 
 jobs:
-  deploy:
+  build-and-deploy:
     runs-on: ubuntu-latest
-    steps:
-      - name: Baixando o código do GitHub
-        uses: actions/checkout@v4
 
-      - name: Enviando arquivos para a VPS
-        uses: appleboy/scp-action@master
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USERNAME }}
-          password: ${{ secrets.VPS_PASSWORD }}
-          source: "."
-          target: "/var/www/provapop"
+    steps:
+    - name: 1. Pegar o código do GitHub
+      uses: actions/checkout@v4
+
+    - name: 2. Preparar o ambiente Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+
+    - name: 3. Instalar dependências
+      run: npm install
+
+    - name: 4. Gerar o Build do Vue.js
+      run: npm run build
+
+    - name: 5. Enviar para o servidor VPS via Senha
+      uses: appleboy/scp-action@master
+      with:
+        host: 76.13.162.112
+        username: root
+        password: ${{ secrets.VPS_PASSWORD }}
+        port: 22
+        source: "docs"
+        target: "/var/www/enem-brasil/dist/"
+        strip_components: 1

@@ -12,17 +12,25 @@ from config import Config
 app = Flask(__name__)
 app.config.from_object(Config)
 
-allowed_origins = os.getenv('CORS_ORIGINS', 'http://localhost:5173,http://localhost:5174,http://localhost:3000').split(',')
+# --- CONFIGURAÇÃO DE CORS CORRIGIDA PARA O PROVAPOP ---
+allowed_origins = [
+    "https://play.provapop.com.br",
+    "http://localhost:5173",
+    "http://localhost:5174",
+    "http://localhost:4173",
+    "http://localhost:3000"
+]
 
 CORS(
     app,
     supports_credentials=True,
     origins=allowed_origins,
     methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allow_headers=['Content-Type', 'Authorization', 'X-Requested-With'],
+    allow_headers=['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
     expose_headers=['Content-Type', 'Authorization'],
     max_age=3600
 )
+# --------------------------------------------------------
 
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
@@ -459,10 +467,6 @@ def register_user():
     user.last_login = datetime.now()
     db.session.commit()
 
-    # Registrar último login
-    user.last_login = datetime.now()
-    db.session.commit()
-
     from auth import generate_token
     token = generate_token(user.id, app.config['SECRET_KEY'], expires_in=3600 * 24)
     
@@ -509,10 +513,6 @@ def login_user():
     if not user.check_password(data['password']):
         return jsonify({'error': 'Senha Incorreta!'}), 401
     
-    # Registrar último login
-    user.last_login = datetime.now()
-    db.session.commit()
-
     # Registrar último login
     user.last_login = datetime.now()
     db.session.commit()
@@ -1185,4 +1185,3 @@ def reset_password():
     db.session.commit()
     
     return jsonify({'message': 'Senha redefinida com sucesso! Você já pode voltar a jogar.'}), 200
-

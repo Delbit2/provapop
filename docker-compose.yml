@@ -41,7 +41,7 @@ services:
       GOOGLE_SHEETS_WORKSHEET_NAME: ${GOOGLE_SHEETS_WORKSHEET_NAME:-Ranking}
       
       # CORS
-      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://localhost:5174,http://localhost:3000}
+      CORS_ORIGINS: ${CORS_ORIGINS:-https://play.provapop.com.br,http://localhost:5173}
       ZOHO_APP_PASSWORD: ${ZOHO_APP_PASSWORD}
     volumes:
       # Montar credentials.json (se existir) - opcional

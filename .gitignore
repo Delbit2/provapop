@@ -1,14 +1,16 @@
+# Arquivos de Sistema e Node
 .DS_Store
-node_modules
-dist
-dist-ssr
+node_modules/
+dist/
+dist-ssr/
+dev-dist/
 *.local
-
 
 # Segredos e Senhas (NUNCA SUBIR)
 .env
 .env.save
 credentials.json
+backend/credentials.json
 
 # Backups e Logs (NUNCA SUBIR)
 backups/
@@ -16,16 +18,3 @@ backup_db.sh
 *.backup
 *.save
 .build.log
-
-# Pastas geradas automaticamente
-dev-dist/
-node_modules/
-.env
-.env.save
-credentials.json
-backups/
-backup_db.sh
-*.backup
-*.save
-.build.log
-dev-dist/

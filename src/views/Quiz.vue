@@ -460,6 +460,14 @@ const questionOptions = computed(() => {
   ]
 })
 
+// 🚀 O ELEVADOR DE QUESTÕES
+function scrollToTop() {
+  window.scrollTo({
+    top: 0,
+    behavior: 'smooth'
+  })
+}
+
 async function loadQuestions(forceRefresh = false) {
   loading.value = true
   error.value = null
@@ -667,32 +675,40 @@ async function confirmAnswer() {
   }
 }
 
+// O Elevador age ao avançar
 function nextQuestion() {
   if (hasNextQuestion.value) {
     currentQuestionIndex.value++
     resetQuestionState()
+    scrollToTop()
   } else if (viewMode.value === 'unanswered' && answeredQuestions.value.length > 0) {
     viewMode.value = 'answered'
     currentQuestionIndex.value = 0
     resetQuestionState()
+    scrollToTop()
   }
 }
 
+// O Elevador age ao voltar
 function previousQuestion() {
   if (hasPreviousQuestion.value) {
     currentQuestionIndex.value--
     resetQuestionState()
+    scrollToTop()
   }
 }
 
+// O Elevador age ao alternar as abas
 function setViewMode(mode: 'unanswered' | 'answered') {
   viewMode.value = mode
   currentQuestionIndex.value = 0
   resetQuestionState()
+  scrollToTop()
 }
 
+// 👇 A MÁGICA FOI FEITA AQUI! O TELETRANSPORTE PARA O TROFÉU! 🏆
 function finishQuiz() {
-  router.push('/')
+  router.push('/missao-cumprida')
 }
 
 function goToHome() {

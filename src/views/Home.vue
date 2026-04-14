@@ -2,106 +2,97 @@
   <div class="home">
     <div class="home__container">
       
-      <!-- CABEÇALHO (Logo Flutuante, Subtítulo e Saudação Dinâmica) -->
+      <!-- 1. CABEÇALHO (A Identidade) -->
       <div class="home__header animate-fade-down">
         <div class="home__header-content">
           <img src="@/assets/logo.png" alt="ProvaPop!" class="home__logo" />
           <p class="home__subtitle">Alcance sua nota mais alta! 🎯</p>
-          <!-- Saudação Personalizada -->
           <p class="home__greeting">{{ dynamicGreeting }}</p>
         </div>
-
-        <div class="home__header-actions">
-          <button class="home__logout-btn" @click="handleLogout" title="Sair">
-            <font-awesome-icon icon="power-off" />
-          </button>
-        </div>
       </div>
 
-      <!-- BARRA DE STATUS (Premium Pills) -->
-      <div class="home__hud animate-slide-up" style="animation-delay: 0.1s;">
-        <div class="hud-badge points">
-          <span class="hud-icon">⚡</span>
-          <span class="hud-value">{{ userPoints }} pts</span>
-        </div>
+      <!-- 2. O PROTAGONISTA: MISSÃO DO DIA (Chamativa e Gigante) -->
+      <div class="home__hero-mission animate-slide-up" style="animation-delay: 0.1s;">
+        <h2 class="section-title">Missão Principal</h2>
         
-        <div class="hud-badge streak" :class="{ 'active': userStreak > 0 }">
-          <span class="hud-icon fire-icon">🔥</span>
-          <span class="hud-value">{{ userStreak }} dias</span>
-        </div>
+        <button class="hero-card" @click="startQuiz('enem')">
+          <div class="hero-card__glow"></div>
+          <div class="hero-card__content">
+            <div class="hero-card__info">
+              <div class="hero-card__badge">RECOMENDADO</div>
+              <h3 class="hero-card__title">Desafio ENEM</h3>
+              <p class="hero-card__desc">Continue sua jornada. 2 questões aguardam você!</p>
+            </div>
+            <div class="hero-card__action">
+              <div class="hero-play-btn">
+                <font-awesome-icon icon="play" />
+              </div>
+            </div>
+          </div>
+        </button>
+
+        <!-- Missão Secundária (Menor para não roubar a cena) -->
+        <button class="secondary-card" @click="startQuiz('foco')">
+          <div class="secondary-card__icon">
+            <font-awesome-icon icon="rocket" />
+          </div>
+          <div class="secondary-card__text">
+            <span class="secondary-title">Da Terra à Lua</span>
+            <span class="secondary-subtitle">Treino Temático</span>
+          </div>
+          <font-awesome-icon icon="chevron-right" class="secondary-arrow" />
+        </button>
       </div>
 
-      <!-- ESTATÍSTICAS (Vidro Fosco) -->
-      <div class="home__stats animate-slide-up" style="animation-delay: 0.2s;">
-        <div class="home__stat-card">
-          <div class="home__stat-item">
-            <font-awesome-icon icon="trophy" class="home__stat-icon wine-icon" />
-            <div class="home__stat-content">
-              <div class="home__stat-value">{{ stats.total_quizzes || 0 }}</div>
-              <div class="home__stat-label">Quizzes</div>
+      <!-- 3. PAINEL DO JOGADOR (Status, Pontos e Foguinho) -->
+      <div class="home__player-dashboard animate-slide-up" style="animation-delay: 0.2s;">
+        <h2 class="section-title">Seu Progresso</h2>
+        
+        <div class="dashboard-glass">
+          <!-- O "Cofre" Principal -->
+          <div class="dashboard-main-stats">
+            <div class="hud-badge streak" :class="{ 'active': userStreak > 0 }">
+              <span class="hud-icon fire-icon">🔥</span>
+              <div class="hud-text">
+                <span class="hud-value">{{ userStreak }}</span>
+                <span class="hud-label">Dias Seguidos</span>
+              </div>
+            </div>
+            
+            <div class="hud-badge points">
+              <span class="hud-icon">⚡</span>
+              <div class="hud-text">
+                <span class="hud-value">{{ userPoints }}</span>
+                <span class="hud-label">Pontos ProvaPop</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Estatísticas Menores -->
+          <div class="dashboard-sub-stats">
+            <div class="sub-stat">
+              <font-awesome-icon icon="trophy" class="sub-stat-icon" />
+              <span class="sub-stat-val">{{ stats.total_quizzes || 0 }}</span>
+              <span class="sub-stat-lbl">Quizzes</span>
+            </div>
+            <div class="sub-stat divider"></div>
+            <div class="sub-stat">
+              <font-awesome-icon icon="check-circle" class="sub-stat-icon success" />
+              <span class="sub-stat-val">{{ stats.accuracy ? `${Math.round(stats.accuracy)}%` : '0%' }}</span>
+              <span class="sub-stat-lbl">Acertos</span>
+            </div>
+            <div class="sub-stat divider"></div>
+            <div class="sub-stat">
+              <font-awesome-icon icon="chart-line" class="sub-stat-icon gold" />
+              <span class="sub-stat-val">{{ stats.ranking_position ? `#${stats.ranking_position}` : '#--' }}</span>
+              <span class="sub-stat-lbl">Ranking</span>
             </div>
           </div>
         </div>
-        <div class="home__stat-card">
-          <div class="home__stat-item">
-            <font-awesome-icon icon="check-circle" class="home__stat-icon orange-icon" />
-            <div class="home__stat-content">
-              <div class="home__stat-value">{{ stats.accuracy ? `${Math.round(stats.accuracy)}%` : '0%' }}</div>
-              <div class="home__stat-label">Acertos</div>
-            </div>
-          </div>
-        </div>
-        <div class="home__stat-card">
-          <div class="home__stat-item">
-            <font-awesome-icon icon="chart-line" class="home__stat-icon wine-icon" />
-            <div class="home__stat-content">
-              <div class="home__stat-value">{{ stats.ranking_position ? `#${stats.ranking_position}` : '#--' }}</div>
-              <div class="home__stat-label">Ranking</div>
-            </div>
-          </div>
-        </div>
       </div>
 
-      <!-- PAINEL DE MISSÕES (O Coração do Game) -->
-      <div class="home__missions animate-slide-up" style="animation-delay: 0.3s;">
-        <div class="home__missions-header">
-          <h2 class="home__missions-title">Missões de Hoje</h2>
-          <p class="home__missions-subtitle">Complete as etapas para manter sua ofensiva!</p>
-        </div>
-
-        <div class="home__journey-buttons">
-          <!-- Botão ENEM (Vinho Premium) -->
-          <button class="mission-btn mission-btn--enem" @click="startQuiz('enem')">
-            <div class="mission-btn-content">
-              <div class="mission-btn-icon">
-                <font-awesome-icon icon="certificate" />
-              </div>
-              <div class="mission-btn-text">
-                <span class="btn-title">ENEM</span>
-                <span class="btn-subtitle">2 questões oficiais</span>
-              </div>
-            </div>
-            <font-awesome-icon icon="play-circle" class="mission-btn-play" />
-          </button>
-
-          <!-- Botão Da Terra à Lua (Laranja Vibrante) -->
-          <button class="mission-btn mission-btn--thematic" @click="startQuiz('foco')">
-            <div class="mission-btn-content">
-              <div class="mission-btn-icon">
-                <font-awesome-icon icon="rocket" />
-              </div>
-              <div class="mission-btn-text">
-                <span class="btn-title">Da Terra à Lua</span>
-                <span class="btn-subtitle">2 questões ProvaPop!</span>
-              </div>
-            </div>
-            <font-awesome-icon icon="play-circle" class="mission-btn-play" />
-          </button>
-        </div>
-      </div>
-
-      <!-- BANNER INTERATIVO DO WEBBOOK (Com Tag "Em Breve") -->
-      <div class="home__webbook-banner animate-slide-up" style="animation-delay: 0.4s;">
+      <!-- 4. BANNER INTERATIVO DO WEBBOOK -->
+      <div class="home__webbook-banner animate-slide-up" style="animation-delay: 0.3s;">
         <div class="webbook-content">
           <div class="webbook-icon">⭐</div>
           <div class="webbook-text-area">
@@ -116,7 +107,7 @@
 
     </div>
 
-    <!-- BOTTOM NAVIGATION BAR (A cereja do bolo App Premium) -->
+    <!-- BOTTOM NAVIGATION BAR -->
     <nav class="bottom-nav">
       <button class="nav-item active">
         <font-awesome-icon icon="home" class="nav-icon" />
@@ -159,7 +150,6 @@ const stats = ref({
 
 const loading = ref(false)
 
-// SAUDAÇÃO DINÂMICA (Bom dia, Boa tarde, Boa noite + Nome)
 const dynamicGreeting = computed(() => {
   const hour = new Date().getHours()
   let greeting = 'Boa noite'
@@ -170,7 +160,6 @@ const dynamicGreeting = computed(() => {
     greeting = 'Boa tarde'
   }
 
-  // Pega o primeiro nome do usuário, se existir. Se não, chama de 'Estudante'
   const userName = authStore.user?.nickname ? authStore.user.nickname.split(' ')[0] : 'Estudante'
   
   return `${greeting}, ${userName}! ✨`
@@ -201,7 +190,6 @@ async function loadStats() {
   }
 }
 
-// Direciona direto para as questões da banca selecionada!
 function startQuiz(categoryId: string) {
   router.push({
     name: 'quiz',
@@ -209,7 +197,6 @@ function startQuiz(categoryId: string) {
   })
 }
 
-// O botão do meio (antigo Jogar) agora leva para a "área de treino"
 function goToCategories() {
   router.push('/categorias')
 }
@@ -226,14 +213,6 @@ function goToProfile() {
   router.push('/perfil')
 }
 
-async function handleLogout() {
-  try {
-    await authStore.logout()
-  } catch (error) {
-    console.error('Erro ao fazer logout:', error)
-  }
-}
-
 onMounted(() => {
   loadStats()
 })
@@ -246,11 +225,10 @@ onMounted(() => {
   --secondary: #E25822;
   --text-main: #2d2422;
   --text-muted: #5a4a46;
-  --border-light: #e8dedc;
+  --border-light: rgba(139, 30, 63, 0.1);
 
   min-height: 100vh;
   padding: 16px 16px 90px 16px; 
-  /* FUNDO QUENTE E PREMIUM: Pêssego suave até o branco e depois desce pro vinho muito claro */
   background-color: #FFF4EF;
   background-image: linear-gradient(180deg, #FFF4EF 0%, #FFFFFF 35%, #FCF2EE 80%, #EBD2CB 100%);
   position: relative;
@@ -262,6 +240,16 @@ onMounted(() => {
   margin: 0 auto;
   position: relative;
   z-index: 10;
+}
+
+/* Títulos das Seções */
+.section-title {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin: 0 0 12px 4px;
 }
 
 /* --- ANIMAÇÕES --- */
@@ -291,8 +279,8 @@ onMounted(() => {
   display: flex;
   justify-content: center;
   align-items: center;
-  margin-bottom: 32px;
-  padding-top: 16px;
+  margin-bottom: 24px;
+  padding-top: 8px;
 }
 
 .home__header-content {
@@ -302,111 +290,267 @@ onMounted(() => {
   text-align: center;
 }
 
-/* LOGO FLUTUANTE 🎈 */
 .home__logo {
-  height: 220px !important;
-  max-height: none !important;
+  height: 180px !important; /* Ajuste sutil para dar espaço à missão gigante */
   width: auto !important;
-  max-width: none !important;
-  margin-bottom: 0;
   object-fit: contain;
   display: block;
   animation: float 4s ease-in-out infinite; 
-  filter: drop-shadow(0 15px 15px rgba(139, 30, 63, 0.15));
+  filter: drop-shadow(0 10px 15px rgba(139, 30, 63, 0.15));
 }
 
 @keyframes float {
   0% { transform: translateY(0px); }
-  50% { transform: translateY(-12px); }
+  50% { transform: translateY(-8px); }
   100% { transform: translateY(0px); }
 }
 
 .home__subtitle {
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 800;
   color: var(--primary);
-  margin: 8px 0 4px 0;
+  margin: 4px 0 4px 0;
   letter-spacing: 0.5px;
-  text-align: center;
 }
 
 .home__greeting {
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--text-muted);
   margin: 0;
 }
 
-/* --- BOTÃO DE SAIR --- */
-.home__header-actions {
-  position: absolute;
-  right: 0;
-  top: 10px;
+/* --- O PROTAGONISTA: MISSÃO DO DIA --- */
+.home__hero-mission {
+  margin-bottom: 32px;
 }
 
-.home__logout-btn {
-  width: 44px;
-  height: 44px;
+.hero-card {
+  width: 100%;
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+  border-radius: 24px;
+  padding: 24px;
+  border: none;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 15px 30px rgba(139, 30, 63, 0.3);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  text-align: left;
+  margin-bottom: 12px;
+}
+
+.hero-card:active {
+  transform: scale(0.97);
+}
+
+.hero-card__glow {
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle, rgba(255,255,255,0.2) 0%, rgba(255,255,255,0) 70%);
+  transform: rotate(45deg);
+  animation: shimmer-glow 4s linear infinite;
+  pointer-events: none;
+}
+
+@keyframes shimmer-glow {
+  0% { transform: rotate(0deg) translate(-10%, -10%); }
+  100% { transform: rotate(360deg) translate(-10%, -10%); }
+}
+
+.hero-card__content {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.hero-card__info {
+  flex: 1;
+}
+
+.hero-card__badge {
+  display: inline-block;
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  padding: 4px 10px;
+  border-radius: 12px;
+  margin-bottom: 10px;
+  letter-spacing: 1px;
+  backdrop-filter: blur(5px);
+}
+
+.hero-card__title {
+  color: #fff;
+  font-size: 26px;
+  font-weight: 900;
+  margin: 0 0 6px 0;
+  text-shadow: 0 2px 5px rgba(0,0,0,0.2);
+}
+
+.hero-card__desc {
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 14px;
+  font-weight: 500;
+  margin: 0;
+  line-height: 1.4;
+  max-width: 90%;
+}
+
+.hero-play-btn {
+  width: 56px;
+  height: 56px;
+  background: #fff;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.9);
-  color: var(--text-muted);
-  border: 2px solid var(--border-light);
   display: flex;
   align-items: center;
   justify-content: center;
+  color: var(--primary);
+  font-size: 22px;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.2);
+  margin-left: 16px;
+  flex-shrink: 0;
+  animation: pulse-play 2s infinite;
+}
+
+@keyframes pulse-play {
+  0% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.4); }
+  70% { box-shadow: 0 0 0 15px rgba(255, 255, 255, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0); }
+}
+
+/* Missão Secundária */
+.secondary-card {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(226, 88, 34, 0.2);
+  border-radius: 16px;
+  padding: 16px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
   cursor: pointer;
-  transition: all 0.3s ease;
-  backdrop-filter: blur(5px);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 4px 15px rgba(226, 88, 34, 0.05);
+  transition: all 0.2s ease;
+}
+
+.secondary-card:active { transform: scale(0.98); }
+
+.secondary-card__icon {
+  width: 40px;
+  height: 40px;
+  background: rgba(226, 88, 34, 0.1);
+  color: var(--secondary);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   font-size: 18px;
 }
 
-.home__logout-btn:hover {
-  border-color: var(--primary);
-  color: var(--primary);
-  transform: scale(1.05);
-  box-shadow: 0 4px 12px rgba(139, 30, 63, 0.1);
+.secondary-card__text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
 }
 
-.home__logout-btn:active {
-  transform: scale(0.95);
+.secondary-title {
+  color: var(--text-main);
+  font-weight: 800;
+  font-size: 16px;
 }
 
-/* --- HUD (Premium Pills) --- */
-.home__hud {
+.secondary-subtitle {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.secondary-arrow {
+  color: var(--border-light);
+  font-size: 16px;
+}
+
+/* --- PAINEL DO JOGADOR --- */
+.home__player-dashboard {
+  margin-bottom: 32px;
+}
+
+.dashboard-glass {
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid rgba(255, 255, 255, 1);
+  border-radius: 24px;
+  padding: 20px;
+  backdrop-filter: blur(15px);
+  box-shadow: 0 10px 30px rgba(139, 30, 63, 0.05);
+}
+
+.dashboard-main-stats {
   display: flex;
   gap: 12px;
-  margin-bottom: 28px;
+  margin-bottom: 20px;
 }
 
 .hud-badge {
+  flex: 1;
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 10px 16px;
-  border-radius: 20px;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.03);
+}
+
+.hud-icon {
+  font-size: 28px;
+}
+
+.hud-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.hud-value {
+  font-size: 20px;
+  font-weight: 900;
+  color: var(--text-main);
+  line-height: 1;
+  margin-bottom: 4px;
+}
+
+.hud-label {
+  font-size: 10px;
   font-weight: 800;
-  font-size: 15px;
-  flex: 1;
-  justify-content: center;
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(10px);
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.04);
+  text-transform: uppercase;
+  color: var(--text-muted);
+  letter-spacing: 0.5px;
 }
 
 .hud-badge.points {
-  color: #D4AF37;
-  border: 1px solid rgba(212, 175, 55, 0.3);
+  border: 1px solid rgba(212, 175, 55, 0.2);
 }
+.hud-badge.points .hud-value { color: #D4AF37; }
 
 .hud-badge.streak {
-  color: var(--text-muted);
   border: 1px solid var(--border-light);
 }
 
 .hud-badge.streak.active {
-  color: var(--secondary);
   border: 1px solid rgba(226, 88, 34, 0.3);
-  background: rgba(226, 88, 34, 0.05);
+  background: #FFF4EF;
+}
+
+.hud-badge.streak.active .hud-value {
+  color: var(--secondary);
 }
 
 .hud-badge.streak.active .fire-icon {
@@ -418,191 +562,56 @@ onMounted(() => {
   100% { transform: scale(1.2); filter: drop-shadow(0 0 6px rgba(226,88,34,0.8)); }
 }
 
-/* --- ESTATÍSTICAS --- */
-.home__stats {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
-  margin-bottom: 32px;
-}
-
-.home__stat-card {
-  background: rgba(255, 255, 255, 0.95);
-  border: 1px solid var(--border-light);
-  border-radius: 20px;
-  padding: 16px 12px;
-  backdrop-filter: blur(10px);
-  box-shadow: 0 6px 15px rgba(0,0,0,0.03);
-  transition: transform 0.3s ease;
-}
-
-.home__stat-card:hover {
-  transform: translateY(-2px);
-  border-color: rgba(139, 30, 63, 0.2);
-}
-
-.home__stat-item {
+.dashboard-sub-stats {
   display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-  gap: 8px;
-}
-
-.home__stat-icon {
-  font-size: 22px;
-}
-
-.wine-icon { color: var(--primary); }
-.orange-icon { color: var(--secondary); }
-
-.home__stat-value {
-  font-size: 20px;
-  font-weight: 900;
-  color: var(--text-main);
-  line-height: 1;
-  margin-bottom: 4px;
-}
-
-.home__stat-label {
-  font-size: 11px;
-  color: var(--text-muted);
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-/* --- MISSÕES --- */
-.home__missions {
-  background: rgba(255, 255, 255, 0.8);
-  border: 1px solid var(--border-light);
-  border-radius: 24px;
-  padding: 24px;
-  margin-bottom: 24px;
-  box-shadow: 0 10px 30px rgba(139, 30, 63, 0.05);
-  backdrop-filter: blur(15px);
-}
-
-.home__missions-header {
-  margin-bottom: 20px;
-  text-align: center;
-}
-
-.home__missions-title {
-  font-size: 22px;
-  font-weight: 900;
-  color: var(--primary);
-  margin: 0 0 4px 0;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-}
-
-.home__missions-subtitle {
-  font-size: 13px;
-  color: var(--text-muted);
-  font-weight: 500;
-  margin: 0;
-}
-
-.home__journey-buttons {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-/* Botões de Missão Super Premium */
-.mission-btn {
-  display: flex;
-  align-items: center;
   justify-content: space-between;
-  width: 100%;
-  padding: 20px;
-  border-radius: 20px;
-  border: none;
-  cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  position: relative;
-  overflow: hidden;
-}
-
-.mission-btn:active {
-  transform: scale(0.97);
-}
-
-.mission-btn::after {
-  content: '';
-  position: absolute;
-  top: 0; left: 0; right: 0; bottom: 0;
-  background: linear-gradient(rgba(255,255,255,0.2), rgba(255,255,255,0));
-  border-radius: 20px;
-  pointer-events: none;
-}
-
-.mission-btn--enem {
-  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
-  box-shadow: 0 8px 20px rgba(139, 30, 63, 0.25);
-}
-
-.mission-btn--thematic {
-  background: linear-gradient(135deg, var(--secondary) 0%, #b84112 100%);
-  box-shadow: 0 8px 20px rgba(226, 88, 34, 0.25);
-}
-
-.mission-btn-content {
-  display: flex;
   align-items: center;
-  gap: 16px;
+  background: rgba(0,0,0,0.02);
+  padding: 12px 16px;
+  border-radius: 16px;
 }
 
-.mission-btn-icon {
-  width: 48px;
-  height: 48px;
-  background: rgba(255, 255, 255, 0.2);
-  border-radius: 14px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 24px;
-  color: #ffffff;
-  backdrop-filter: blur(5px);
-}
-
-.mission-btn-text {
+.sub-stat {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
-  color: #ffffff;
+  align-items: center;
+  gap: 4px;
+  flex: 1;
 }
 
-.btn-title {
-  font-size: 20px;
-  font-weight: 900;
-  margin-bottom: 2px;
-  text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+.sub-stat.divider {
+  flex: 0;
+  width: 1px;
+  height: 30px;
+  background: var(--border-light);
 }
 
-.btn-subtitle {
-  font-size: 13px;
-  font-weight: 600;
-  opacity: 0.9;
+.sub-stat-icon {
+  font-size: 16px;
+  color: var(--primary);
+}
+.sub-stat-icon.success { color: #2e7d32; }
+.sub-stat-icon.gold { color: #D4AF37; }
+
+.sub-stat-val {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--text-main);
 }
 
-.mission-btn-play {
-  font-size: 32px;
-  color: rgba(255, 255, 255, 0.9);
-  transition: transform 0.3s ease;
+.sub-stat-lbl {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
 }
 
-.mission-btn:hover .mission-btn-play {
-  transform: scale(1.1) translateX(4px);
-}
-
-/* --- BANNER WEBBOOK "EM BREVE" --- */
+/* --- BANNER WEBBOOK --- */
 .home__webbook-banner {
   background: rgba(255, 255, 255, 0.9);
   border: 1px solid var(--border-light);
   border-radius: 20px;
-  padding: 20px;
+  padding: 16px 20px;
   margin-bottom: 24px;
   display: flex;
   align-items: center;
@@ -617,24 +626,24 @@ onMounted(() => {
 }
 
 .webbook-icon {
-  font-size: 32px;
+  font-size: 28px;
   filter: grayscale(0.8);
   opacity: 0.7;
 }
 
 .webbook-title {
   color: var(--text-main);
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 800;
-  margin: 0 0 6px 0;
+  margin: 0 0 4px 0;
 }
 
 .webbook-badge-soon {
   background: var(--text-muted);
   color: white;
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 800;
-  padding: 4px 8px;
+  padding: 3px 6px;
   border-radius: 6px;
   letter-spacing: 0.5px;
 }
@@ -643,20 +652,16 @@ onMounted(() => {
   background: var(--border-light);
   color: var(--text-muted);
   border: none;
-  padding: 12px 20px;
+  padding: 10px 16px;
   border-radius: 12px;
   font-weight: 800;
-  font-size: 13px;
+  font-size: 12px;
   cursor: pointer;
   flex-shrink: 0;
   transition: all 0.2s ease;
 }
 
-.webbook-btn-disabled:hover {
-  background: #dfd4d2;
-}
-
-/* --- BOTTOM NAVIGATION BAR (Menu Inferior Premium) --- */
+/* --- BOTTOM NAVIGATION BAR --- */
 .bottom-nav {
   position: fixed;
   bottom: 0;
@@ -701,7 +706,6 @@ onMounted(() => {
   font-weight: 700;
 }
 
-/* Estado Ativo */
 .nav-item.active {
   color: var(--primary);
   opacity: 1;
@@ -712,26 +716,12 @@ onMounted(() => {
   filter: drop-shadow(0 4px 6px rgba(139, 30, 63, 0.2));
 }
 
-.nav-item:active .nav-icon {
-  transform: scale(0.85);
-}
-
-/* Responsividade */
+/* Responsividade Básica */
 @media (min-width: 768px) {
   .home { padding: 32px 32px 100px 32px; }
-  .home__container { max-width: 800px; }
-  .home__header { margin-bottom: 40px; }
-  .home__logo { height: 260px !important; }
-  .home__subtitle { font-size: 24px; } 
-  .home__hud { justify-content: center; gap: 24px; }
-  .hud-badge { flex: none; width: 220px; padding: 12px 20px; font-size: 16px; }
-  .home__stats { gap: 20px; margin-bottom: 40px; }
-  .home__stat-card { padding: 20px; }
-  .home__missions { padding: 32px; }
-  .home__missions-title { font-size: 26px; }
-  .mission-btn { padding: 24px; }
-  .mission-btn-icon { width: 56px; height: 56px; font-size: 28px; }
-  .btn-title { font-size: 24px; }
+  .home__container { max-width: 600px; } /* Mantém formato celular no desktop */
+  .hero-card__title { font-size: 32px; }
+  .hud-value { font-size: 24px; }
   
   .bottom-nav {
     max-width: 600px;

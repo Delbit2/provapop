@@ -8,19 +8,21 @@ import CategoryMenu from '@/views/CategoryMenu.vue'
 import Ranking from '@/views/Ranking.vue'
 import EsqueciSenha from '@/views/EsqueciSenha.vue'
 import NovaSenha from '@/views/NovaSenha.vue'
+// 👇 Importamos a nova tela de Missão Cumprida aqui!
+import MissionCompleted from '@/views/MissionCompleted.vue'
 import { useAuthStore } from '@/stores/auth'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
     {
-      path: '/login', // 👈 Mudamos de /entrar para /login
+      path: '/login',
       name: 'login',
       component: Login,
       meta: { requiresGuest: true }
     },
     {
-      path: '/register', // 👈 Mudamos de /cadastro para /register
+      path: '/register',
       name: 'register',
       component: Register,
       meta: { requiresGuest: true }
@@ -44,7 +46,7 @@ const router = createRouter({
       meta: { requiresAuth: true }
     },
     {
-      path: '/categorias', // 👈 Mantivemos igual, arquivo CategoryMenu.vue
+      path: '/categorias',
       name: 'categories',
       component: CategoryMenu,
       meta: { requiresAuth: true }
@@ -60,8 +62,15 @@ const router = createRouter({
       path: '/quiz',
       redirect: '/categorias'
     },
+    // 👇 Inserimos a Rota do Troféu logo após o Quiz!
     {
-      path: '/profile', // 👈 Mudamos de /perfil para /profile
+      path: '/missao-cumprida',
+      name: 'mission-completed',
+      component: MissionCompleted,
+      meta: { requiresAuth: true }
+    },
+    {
+      path: '/perfil',
       name: 'profile',
       component: Profile,
       meta: { requiresAuth: true }
@@ -85,7 +94,7 @@ router.beforeEach(async (to, _from, next) => {
     
     const authenticated = await authStore.verifyAuth()
     if (!authenticated) {
-      return next('/login') // 👈 Redirecionando para a nova rota correta
+      return next('/login')
     }
     
     return next()

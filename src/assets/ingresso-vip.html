@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ProvaPop! - Ingresso VIP</title>
+    <!-- Importando Vue 3 -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <!-- Fonte Montserrat -->
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700;900&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --gold-light: #ffd700;
+            --gold-dark: #daa520;
+            --bg-light: #fdfbf7;
+            --text-dark: #1a1a1a;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Montserrat', sans-serif;
+            background-color: var(--bg-light);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* O FUNDO: Fachos de Luz de Palco (Spotlights) */
+        .stage-background {
+            position: fixed;
+            top: 0; left: 0; width: 100vw; height: 100vh;
+            background: radial-gradient(circle at center, #ffffff 0%, #f0ece1 100%);
+            z-index: -1;
+            overflow: hidden;
+        }
+
+        .spotlight-left, .spotlight-right {
+            position: absolute;
+            top: -10%;
+            width: 300px;
+            height: 120vh;
+            background: linear-gradient(to bottom, rgba(255, 215, 0, 0.4) 0%, rgba(255, 215, 0, 0) 80%);
+            border-radius: 50%;
+            filter: blur(40px);
+            opacity: 0.6;
+        }
+
+        .spotlight-left {
+            left: -10%;
+            transform: rotate(-30deg);
+            animation: moveLightLeft 5s infinite alternate ease-in-out;
+        }
+
+        .spotlight-right {
+            right: -10%;
+            transform: rotate(30deg);
+            animation: moveLightRight 6s infinite alternate ease-in-out;
+        }
+
+        @keyframes moveLightLeft {
+            0% { transform: rotate(-30deg) translateX(0); }
+            100% { transform: rotate(-15deg) translateX(50px); }
+        }
+        @keyframes moveLightRight {
+            0% { transform: rotate(30deg) translateX(0); }
+            100% { transform: rotate(15deg) translateX(-50px); }
+        }
+
+        /* O INGRESSO VIP (O Meio) */
+        .vip-ticket {
+            background: #ffffff;
+            width: 340px;
+            border-radius: 20px;
+            box-shadow: 0 25px 50px rgba(0,0,0,0.15), 0 0 0 8px rgba(218, 165, 32, 0.1);
+            position: relative;
+            text-align: center;
+            overflow: hidden;
+            border: 2px solid var(--gold-light);
+        }
+
+        /* O TOPO (A Arte) - Disco de Platina / Estrelas */
+        .ticket-header {
+            background: linear-gradient(135deg, #1a1a1a, #333);
+            padding: 30px 20px 40px;
+            color: white;
+            position: relative;
+            border-bottom: 4px solid var(--gold-dark);
+        }
+
+        .stars {
+            position: absolute;
+            top: 10px; left: 0; right: 0;
+            font-size: 1.2rem;
+            letter-spacing: 15px;
+            opacity: 0.8;
+            color: var(--gold-light);
+        }
+
+        .ticket-header h2 {
+            margin: 15px 0 5px;
+            font-size: 1.4rem;
+            text-transform: uppercase;
+            font-weight: 900;
+            color: var(--gold-light);
+        }
+
+        .username {
+            font-size: 1.8rem;
+            margin: 0;
+            font-weight: 900;
+            letter-spacing: 1px;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+        }
+
+        /* PICOTE DO INGRESSO */
+        .ticket-divider {
+            height: 20px;
+            background: radial-gradient(circle, var(--bg-light) 10px, transparent 11px) repeat-x;
+            background-size: 24px 20px;
+            margin-top: -10px;
+            position: relative;
+            z-index: 2;
+        }
+
+        /* DADOS DO JOGADOR */
+        .ticket-body {
+            padding: 20px;
+            background: #fff;
+        }
+
+        .stats-grid {
+            display: flex;
+            justify-content: space-around;
+            margin-bottom: 20px;
+        }
+
+        .stat-box {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 12px;
+            border: 1px solid #eee;
+            width: 40%;
+        }
+
+        .stat-box span {
+            display: block;
+            font-size: 0.8rem;
+            color: #666;
+            text-transform: uppercase;
+            font-weight: bold;
+        }
+
+        .stat-box strong {
+            font-size: 1.5rem;
+            color: var(--text-dark);
+            font-weight: 900;
+        }
+
+        /* A BASE (A Máquina de Vendas) */
+        .ticket-footer {
+            padding: 15px 20px 25px;
+            background: #fafafa;
+            border-top: 2px dashed #ddd;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo-area {
+            text-align: left;
+        }
+
+        .logo-area img {
+            width: 100px; /* Tamanho da sua logo_gold_1 */
+            height: auto;
+            filter: drop-shadow(0 4px 6px rgba(218, 165, 32, 0.4));
+        }
+
+        .logo-area p {
+            margin: 5px 0 0;
+            font-size: 0.7rem;
+            font-weight: bold;
+            color: #888;
+        }
+
+        /* QR CODE SIMULADO COM CSS */
+        .qr-code {
+            width: 60px;
+            height: 60px;
+            background: 
+                linear-gradient(45deg, #000 25%, transparent 25%, transparent 75%, #000 75%, #000), 
+                linear-gradient(45deg, #000 25%, transparent 25%, transparent 75%, #000 75%, #000);
+            background-color: #fff;
+            background-size: 10px 10px;
+            background-position: 0 0, 5px 5px;
+            border: 3px solid #000;
+            border-radius: 4px;
+            padding: 2px;
+        }
+
+        /* BOTÕES DE AÇÃO */
+        .action-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-top: 25px;
+            width: 340px;
+            z-index: 10;
+        }
+
+        button {
+            padding: 15px;
+            border-radius: 30px;
+            font-family: 'Montserrat', sans-serif;
+            font-weight: bold;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            border: none;
+        }
+
+        .btn-share {
+            background: linear-gradient(90deg, var(--gold-dark), var(--gold-light));
+            color: #000;
+            box-shadow: 0 5px 15px rgba(218, 165, 32, 0.4);
+        }
+
+        .btn-share:hover {
+            transform: scale(1.05);
+            box-shadow: 0 8px 20px rgba(218, 165, 32, 0.6);
+        }
+
+        .btn-back {
+            background: #fff;
+            color: var(--text-dark);
+            border: 2px solid #ddd;
+        }
+
+        .btn-back:hover {
+            background: #f0f0f0;
+            border-color: #ccc;
+        }
+
+        /* Container Principal do Vue */
+        #app {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            z-index: 1;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- O Fundo Animado -->
+    <div class="stage-background">
+        <div class="spotlight-left"></div>
+        <div class="spotlight-right"></div>
+    </div>
+
+    <!-- O APP VUE -->
+    <div id="app">
+        
+        <div class="vip-ticket">
+            <!-- Topo -->
+            <div class="ticket-header">
+                <div class="stars">✨ 🎵 ✨</div>
+                <h2>Disco de Ouro Conquistado!</h2>
+                <p class="username">@{{ nomeUsuario }}</p>
+            </div>
+            
+            <!-- Picote do Ingresso -->
+            <div class="ticket-divider"></div>
+
+            <!-- Meio -->
+            <div class="ticket-body">
+                <div class="stats-grid">
+                    <div class="stat-box">
+                        <span>Pontuação</span>
+                        <strong>{{ pontos }}</strong>
+                    </div>
+                    <div class="stat-box">
+                        <span>Ofensiva</span>
+                        <strong>🔥 {{ ofensiva }} dias</strong>
+                    </div>
+                </div>
+                <p style="font-size: 0.85rem; color: #666; margin: 0;">Ingresso válido para o Hall da Fama.</p>
+            </div>
+
+            <!-- Base -->
+            <div class="ticket-footer">
+                <div class="logo-area">
+                    <!-- AQUI VAI A SUA LOGO! Se o caminho falhar, vai mostrar o texto alternativo -->
+                    <img src="./assets/logo_gold_1.png" alt="ProvaPop! Gold Logo" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                    <!-- Texto de fallback caso a imagem não carregue -->
+                    <h3 style="display:none; margin:0; color:#daa520; font-weight:900;">ProvaPop!</h3>
+                    <p>provapop.com.br</p>
+                </div>
+                <!-- O QR Code feito no CSS -->
+                <div class="qr-code"></div>
+            </div>
+        </div>
+
+        <!-- Botões -->
+        <div class="action-buttons">
+            <button class="btn-share" @click="compartilharHit">📲 Compartilhar Hit</button>
+            <button class="btn-back" @click="voltarBackstage">🎸 Voltar ao Backstage</button>
+        </div>
+
+    </div>
+
+    <!-- Script do Vue 3 -->
+    <script>
+        const { createApp } = Vue
+
+        createApp({
+            data() {
+                return {
+                    nomeUsuario: 'Fernando',
+                    pontos: 15420,
+                    ofensiva: 12
+                }
+            },
+            methods: {
+                compartilharHit() {
+                    alert(`Preparando para compartilhar a conquista de ${this.nomeUsuario} no Instagram/WhatsApp! 🚀`);
+                    // Aqui entrará a Web Share API do PWA no futuro
+                },
+                voltarBackstage() {
+                    alert("Voltando para a tela inicial das trilhas... 🎸");
+                }
+            }
+        }).mount('#app')
+    </script>
+
+</body>
+</html>

@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Card Colecionável - ProvaPop!</title>
+    <style>
+        /* Reset básico e fundo escuro de "Palco" */
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #0a0a12; /* Azul muito escuro, quase preto */
+            font-family: 'Montserrat', sans-serif; /* A mesma vibe da sua logo */
+            color: #fff;
+        }
+
+        /* O Card Colecionável */
+        .card-colecionavel {
+            position: relative;
+            width: 300px;
+            height: 480px;
+            background: linear-gradient(145deg, #1a1a2e, #11111f);
+            border-radius: 20px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
+            text-align: center;
+            /* A mágica da borda dourada brilhante */
+            box-shadow: 0 0 15px rgba(218, 165, 32, 0.2), 
+                        inset 0 0 2px rgba(255, 215, 0, 0.5);
+            border: 1px solid rgba(218, 165, 32, 0.4);
+            overflow: hidden;
+            transition: transform 0.3s ease;
+        }
+
+        /* Efeito de levitação quando passa o mouse (ou dedo) */
+        .card-colecionavel:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 15px 30px rgba(218, 165, 32, 0.4), 
+                        inset 0 0 5px rgba(255, 215, 0, 0.6);
+        }
+
+        /* Efeito de luz varrendo o card (Holográfico) */
+        .card-colecionavel::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: linear-gradient(45deg, transparent, rgba(255, 215, 0, 0.1), transparent);
+            transform: rotate(45deg);
+            animation: brilho 3s infinite linear;
+            pointer-events: none;
+        }
+
+        @keyframes brilho {
+            0% { transform: translate(-50%, -50%) rotate(45deg); }
+            100% { transform: translate(50%, 50%) rotate(45deg); }
+        }
+
+        .header-card p {
+            font-size: 0.8rem;
+            color: #daa520; /* Goldenrod */
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+
+        .header-card h2 {
+            margin: 0;
+            font-size: 1.5rem;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+        }
+
+        /* AQUI ENTRA A SUA ARTE! */
+        .trofeu-img {
+            width: 200px;
+            height: auto;
+            margin: 20px 0;
+            filter: drop-shadow(0 10px 15px rgba(218, 165, 32, 0.5)); /* Sombra dourada projetada */
+            z-index: 2;
+        }
+
+        .footer-card {
+            width: 100%;
+            border-top: 1px solid rgba(218, 165, 32, 0.3);
+            padding-top: 15px;
+            z-index: 2;
+        }
+
+        .footer-card p {
+            margin: 0;
+            font-size: 0.9rem;
+            color: #aaa;
+        }
+
+        .raridade {
+            display: inline-block;
+            background: linear-gradient(90deg, #daa520, #ffd700);
+            color: #000;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 0.8rem;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="card-colecionavel">
+        <div class="header-card">
+            <p>Jornada Concluída</p>
+            <h2>Era dos Festivais</h2>
+        </div>
+
+        <!-- Coloque o caminho correto da sua imagem aqui -->
+        <img src="assets/logo_gold_1.png" alt="Troféu Gold ProvaPop" class="trofeu-img">
+
+        <div class="footer-card">
+            <p>Card Desbloqueado</p>
+            <div class="raridade">⭐ ÉPICO ⭐</div>
+        </div>
+    </div>
+
+</body>
+</html>

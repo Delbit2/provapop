@@ -16,7 +16,7 @@
           <Card variant="elevated" class="profile__card">
             
             <!-- AQUI ENTRA A SUA LOGO NOVA! -->
-            <div class="profile__avatar-section">
+              <div class="profile__avatar-section">
               <div class="profile__avatar">
                 <img src="@/assets/avatar-default.png" alt="Avatar VIP" class="profile__avatar-img" />
               </div>
@@ -572,7 +572,7 @@ onMounted(async () => {
   padding: 16px;
   border: none;
   border-radius: 12px;
-  background: #c90d0df3;
+  background: #E25822;
   color: #ffffff;
   font-size: 16px;
   font-weight: 800;
@@ -598,7 +598,7 @@ onMounted(async () => {
 .profile__save-btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
-  filter: grayscale(0.5);
+  filter: grayscale(0.2);
 }
 
 .profile__cancel-btn {

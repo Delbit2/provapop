@@ -45,3 +45,4 @@ jobs:
           cd /var/www/provapop
           docker compose down || true
           docker compose up -d --build
+          systemctl restart nginx

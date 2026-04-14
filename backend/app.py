@@ -12,19 +12,29 @@ from config import Config
 app = Flask(__name__)
 app.config.from_object(Config)
 
-# --- CONFIGURAÇÃO DE CORS CORRIGIDA PARA O PROVAPOP ---
-allowed_origins = [
+# --- CONFIGURAÇÃO DE CORS BLINDADA PARA O PROVAPOP ---
+# Lista de origens garantidas (hardcoded)
+GUARANTEED_ORIGINS = [
     "https://play.provapop.com.br",
+    "http://play.provapop.com.br",
     "http://localhost:5173",
     "http://localhost:5174",
     "http://localhost:4173",
     "http://localhost:3000"
 ]
 
+# Pega origens das variáveis de ambiente (se existirem)
+env_origins = os.environ.get('CORS_ORIGINS', '')
+if env_origins:
+    GUARANTEED_ORIGINS.extend([origin.strip() for origin in env_origins.split(',') if origin.strip()])
+
+# Remove duplicatas
+final_origins = list(set(GUARANTEED_ORIGINS))
+
 CORS(
     app,
     supports_credentials=True,
-    origins=allowed_origins,
+    origins=final_origins,
     methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allow_headers=['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
     expose_headers=['Content-Type', 'Authorization'],

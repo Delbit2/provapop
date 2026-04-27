@@ -15,16 +15,25 @@ library.add(fas as any, fab as any)
 const app = createApp(App)
 const pinia = createPinia()
 
+app.config.errorHandler = (err, _instance, info) => {
+  console.error('[VUE ERROR]', err, info)
+}
+
 app.use(pinia)
 app.use(router)
 app.component('font-awesome-icon', FontAwesomeIcon)
 
-const authStore = useAuthStore()
-// Verificar autenticação na inicialização, mas não bloquear o mount
-// O router guard cuidará da autenticação nas rotas
-authStore.verifyAuth().catch(() => {
-  // Ignorar erros na verificação inicial
-  // O usuário será redirecionado pelo router guard se necessário
-}).finally(() => {
-  app.mount('#app')
-})
+async function bootstrap() {
+  try {
+    const authStore = useAuthStore(pinia)
+
+    authStore.initAuthListener()
+    await authStore.initAuth()
+  } catch (err) {
+    console.error('[BOOTSTRAP] Falha ao inicializar autenticação:', err)
+  } finally {
+    app.mount('#app')
+  }
+}
+
+bootstrap()

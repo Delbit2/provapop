@@ -3,20 +3,19 @@
     <div class="profile__container">
       <Transition name="fade" appear>
         <div class="profile__content">
+          
+          <!-- CABEÇALHO COMPRIMIDO -->
           <div class="profile__header">
-            <button class="profile__back-btn" @click="goBack" title="Voltar">
-              <font-awesome-icon icon="arrow-left"></font-awesome-icon>
-            </button>
             <div class="profile__header-content">
               <h1 class="profile__title">Meu Perfil</h1>
               <p class="profile__subtitle">Área VIP • Gerencie seus dados</p>
             </div>
           </div>
 
+          <!-- CARD DE PERFIL -->
           <Card variant="elevated" class="profile__card">
             
-            <!-- AQUI ENTRA A SUA LOGO NOVA! -->
-              <div class="profile__avatar-section">
+            <div class="profile__avatar-section">
               <div class="profile__avatar">
                 <img src="@/assets/avatar-default.png" alt="Avatar VIP" class="profile__avatar-img" />
               </div>
@@ -26,7 +25,6 @@
               <div class="profile__info-item">
                 <font-awesome-icon icon="user" class="profile__info-icon"></font-awesome-icon>
                 <div class="profile__info-content">
-                  <!-- Alterado para Nome Artístico -->
                   <div class="profile__info-label">Nome Artístico</div>
                   <div class="profile__info-value">{{ form.nickname || 'Carregando...' }}</div>
                 </div>
@@ -56,7 +54,6 @@
                   placeholder="ex: futuro.calouro@email.com"
                   required
                 />
-                <p class="profile__hint">Usado para seu acesso VIP e recuperação</p>
               </div>
 
               <div class="profile__field">
@@ -69,7 +66,7 @@
                     v-model="form.password"
                     :type="showPassword ? 'text' : 'password'"
                     class="profile__input"
-                    placeholder="Deixe em branco para manter a atual"
+                    placeholder="Deixe em branco p/ manter"
                     :minlength="6"
                   />
                   <button
@@ -80,11 +77,9 @@
                     <font-awesome-icon :icon="showPassword ? 'eye-slash' : 'eye'"></font-awesome-icon>
                   </button>
                 </div>
-                <p class="profile__hint">Mínimo de 6 caracteres</p>
               </div>
 
               <div class="profile__actions">
-                <!-- Botão Salvar apenas em Laranja -->
                 <button
                   type="submit"
                   :disabled="loading || !hasChanges"
@@ -105,28 +100,77 @@
             </form>
           </Card>
 
-          <Card variant="outlined" class="profile__stats">
-            <!-- Título atualizado para "No Holofote" -->
-            <h2 class="profile__stats-title">No Holofote</h2>
-            <div v-if="loadingStats" class="profile__stats-loading">
-              <font-awesome-icon icon="circle-notch" class="profile__spinner"></font-awesome-icon>
-              Buscando dados...
+          <!-- PILHA DE BANNERS (O Hub de Promoções) -->
+          <div class="profile__banners-wrapper">
+            
+            <!-- 1. Banner Monetização (E-book) -->
+            <div class="promo-banner promo-banner--ebook animate-slide-up" style="animation-delay: 0.1s">
+              <div class="promo-banner__content">
+                <div class="promo-banner__icon" style="filter: grayscale(0.2);">📚</div>
+                <div class="promo-banner__text">
+                  <h3>E-book ProvaPop!</h3>
+                  <span class="badge-available">JÁ DISPONÍVEL</span>
+                </div>
+              </div>
+              <button type="button" class="promo-banner__btn promo-banner__btn--ebook" @click="router.push('/ebook')">
+                Garantir 🚀
+              </button>
             </div>
-            <div v-else class="profile__stats-grid">
-              <div class="profile__stat-item">
-                <div class="profile__stat-value">{{ stats.totalQuizzes }}</div>
-                <div class="profile__stat-label">Desafios Completos</div>
+
+            <!-- 2. Banner Ingresso (Marketing Orgânico) -->
+            <div class="promo-banner promo-banner--ticket animate-slide-up" style="animation-delay: 0.2s">
+              <div class="promo-banner__content">
+                <div class="promo-banner__icon">🎸</div>
+                <div class="promo-banner__text">
+                  <h3>Ingresso VIP</h3>
+                  <p>Quem você levaria pro show?</p>
+                </div>
               </div>
-              <div class="profile__stat-item">
-                <div class="profile__stat-value">{{ stats.totalQuizzes > 0 ? stats.accuracy.toFixed(1) : '0.0' }}%</div>
-                <div class="profile__stat-label">Taxa de Acerto</div>
-              </div>
-              <div class="profile__stat-item">
-                <div class="profile__stat-value">{{ stats.position > 0 ? `#${stats.position}` : '--' }}</div>
-                <div class="profile__stat-label">Posição no Ranking</div>
-              </div>
+              <button type="button" class="promo-banner__btn promo-banner__btn--primary" @click="router.push('/ingresso')">
+                <font-awesome-icon icon="ticket-alt" /> Compartilhar
+              </button>
             </div>
-          </Card>
+
+            <!-- 3. Banner Apoio / Café (Comunidade) -->
+            <div class="promo-banner promo-banner--coffee animate-slide-up" style="animation-delay: 0.3s">
+              <div class="promo-banner__content">
+                <div class="promo-banner__icon float">☕</div>
+                <div class="promo-banner__text">
+                  <h3>Apoie o Projeto</h3>
+                  <p>Pague um café aos devs.</p>
+                </div>
+              </div>
+              <button type="button" class="promo-banner__btn promo-banner__btn--accent" @click="handleSupport">
+                Apoiar 
+                <font-awesome-icon icon="heart" class="heart-icon" />
+              </button>
+            </div>
+
+          </div>
+
+          <!-- ÁREA DE SEGURANÇA: LOGOUT DISCRETO -->
+          <div class="profile__logout-wrapper animate-slide-up" style="animation-delay: 0.4s">
+            <button type="button" class="profile__logout-btn" @click="handleLogout">
+              <font-awesome-icon icon="power-off"></font-awesome-icon>
+              Desconectar deste dispositivo
+            </button>
+          </div>
+
+          <!-- REDES SOCIAIS (ACOMPANHE OS BASTIDORES) -->
+          <div class="profile__social-wrapper animate-slide-up" style="animation-delay: 0.5s">
+            <p class="social-title">Acompanhe os bastidores</p>
+            <div class="social-links">
+              <!-- INSTAGRAM -->
+              <a href="https://www.instagram.com/provapop/" target="_blank" class="social-btn social-btn--insta" title="Siga no Instagram">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512" fill="currentColor" width="20" height="20"><path d="M224.1 141c-63.6 0-114.9 51.3-114.9 114.9s51.3 114.9 114.9 114.9S339 319.5 339 255.9 287.7 141 224.1 141zm0 189.6c-41.1 0-74.7-33.5-74.7-74.7s33.5-74.7 74.7-74.7 74.7 33.5 74.7 74.7-33.6 74.7-74.7 74.7zm146.4-194.3c0 14.9-12 26.8-26.8 26.8-14.9 0-26.8-12-26.8-26.8s12-26.8 26.8-26.8 26.8 12 26.8 26.8zm76.1 27.2c-1.7-35.9-9.9-67.7-36.2-93.9-26.2-26.2-58-34.4-93.9-36.2-37-2.1-147.9-2.1-184.9 0-35.8 1.7-67.6 9.9-93.9 36.1s-34.4 58-36.2 93.9c-2.1 37-2.1 147.9 0 184.9 1.7 35.9 9.9 67.7 36.2 93.9s58 34.4 93.9 36.2c37 2.1 147.9 2.1 184.9 0 35.9-1.7 67.7-9.9 93.9-36.2 26.2-26.2 34.4-58 36.2-93.9 2.1-37 2.1-147.8 0-184.8zM398.8 388c-7.8 19.6-22.9 34.7-42.6 42.6-29.5 11.7-99.5 9-132.1 9s-102.7 2.6-132.1-9c-19.6-7.8-34.7-22.9-42.6-42.6-11.7-29.5-9-99.5-9-132.1s-2.6-102.7 9-132.1c7.8-19.6 22.9-34.7 42.6-42.6 29.5-11.7 99.5-9 132.1-9s102.7-2.6 132.1 9c19.6 7.8 34.7 22.9 42.6 42.6 11.7 29.5 9 99.5 9 132.1s2.7 102.7-9 132.1z"/></svg>
+              </a>
+              <!-- YOUTUBE (Acervo de Músicas) -->
+              <a href="https://www.youtube.com/@provapop" target="_blank" class="social-btn social-btn--youtube" title="Acervo Musical Oficial">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512" fill="currentColor" width="22" height="22"><path d="M549.655 124.083c-6.281-23.65-24.787-42.276-48.284-48.597C458.781 64 288 64 288 64S117.22 64 74.629 75.486c-23.497 6.322-42.003 24.947-48.284 48.597-11.412 42.867-11.412 132.305-11.412 132.305s0 89.438 11.412 132.305c6.281 23.65 24.787 41.5 48.284 47.821C117.22 448 288 448 288 448s170.78 0 213.371-11.486c23.497-6.321 42.003-24.171 48.284-47.821 11.412-42.867 11.412-132.305 11.412-132.305s0-89.438-11.412-132.305zm-317.51 213.508V175.185l142.739 81.205-142.739 81.201z"/></svg>
+              </a>
+            </div>
+          </div>
+
         </div>
       </Transition>
     </div>
@@ -154,14 +198,7 @@ const originalForm = ref({
   password: ''
 })
 
-const stats = ref({
-  totalQuizzes: 0,
-  accuracy: 0,
-  position: 0
-})
-
 const loading = ref(false)
-const loadingStats = ref(false)
 const showPassword = ref(false)
 const error = ref<string | null>(null)
 const success = ref<string | null>(null)
@@ -178,7 +215,7 @@ async function loadUserData() {
   try {
     const userData = await api.auth.me()
     if (userData.user) {
-      form.value.nickname = userData.user.nickname || ''
+      form.value.nickname = userData.user.nickname || userData.user.nome || userData.user.name || userData.user.username || ''
       form.value.email = userData.user.email || ''
       originalForm.value.email = userData.user.email || ''
       
@@ -192,40 +229,6 @@ async function loadUserData() {
     }
   } finally {
     loading.value = false
-  }
-}
-
-async function loadStats() {
-  loadingStats.value = true
-  
-  try {
-    const statsData = await api.users.getStats()
-    stats.value.totalQuizzes = statsData.total_quizzes || 0
-    stats.value.accuracy = statsData.accuracy || 0
-    
-    try {
-      const rankingData = await api.ranking.get('all')
-      if (rankingData && Array.isArray(rankingData)) {
-        const currentUser = rankingData.find((r: any) => r.user_id === authStore.user?.id)
-        if (currentUser && currentUser.position) {
-          stats.value.position = currentUser.position
-        } else {
-          stats.value.position = 0
-        }
-      } else {
-        stats.value.position = 0
-      }
-    } catch (rankingErr: any) {
-      console.error('Erro ao carregar ranking:', rankingErr)
-      stats.value.position = 0
-    }
-  } catch (err: any) {
-    console.error('Erro ao carregar estatísticas:', err)
-    stats.value.totalQuizzes = 0
-    stats.value.accuracy = 0
-    stats.value.position = 0
-  } finally {
-    loadingStats.value = false
   }
 }
 
@@ -279,101 +282,104 @@ function handleCancel() {
   success.value = null
 }
 
-function goBack() {
-  router.push('/')
+function handleSupport() {
+  alert('Que demais! 🧡 Em breve lançaremos nossa campanha de financiamento coletivo. Guarde esse café para nós! ☕')
+}
+
+async function handleLogout() {
+  const confirmed = confirm('Tem certeza que deseja desconectar deste dispositivo?')
+  if (confirmed) {
+    try {
+      if (typeof authStore.logout === 'function') {
+        await authStore.logout()
+      } else {
+        authStore.user = null
+        localStorage.removeItem('token')
+        localStorage.removeItem('user')
+      }
+      router.push('/login')
+    } catch (err) {
+      console.error('Erro ao fazer logout:', err)
+      localStorage.clear()
+      router.push('/login')
+    }
+  }
 }
 
 onMounted(async () => {
   if (authStore.user) {
-    form.value.nickname = authStore.user.nickname || ''
+    form.value.nickname = authStore.user.nickname || authStore.user.nome || authStore.user.name || authStore.user.username || ''
     form.value.email = authStore.user.email || ''
     originalForm.value.email = authStore.user.email || ''
   }
   
   await loadUserData()
-  await loadStats()
 })
 </script>
 
 <style scoped>
+/* =========================================
+   ESTRUTURA PRINCIPAL
+   ========================================= */
 .profile {
-  min-height: 100vh;
-  padding: 20px;
+  min-height: 100dvh; 
+  padding: max(2vh, 16px) 20px 120px 20px; 
   background-color: #ffffff;
   background-image: linear-gradient(180deg, #ffffff 0%, #ffffff 40%, #fcf2ee 70%, #ebd2cb 100%);
+  display: flex;
+  flex-direction: column;
 }
 
 .profile__container {
-  max-width: 100%;
+  width: 100%;
+  max-width: 420px;
   margin: 0 auto;
   z-index: 10;
   position: relative;
+  flex-grow: 1; 
+  display: flex;
+  flex-direction: column;
 }
 
 .profile__content {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  flex-grow: 1;
+  gap: 16px; 
 }
 
+/* =========================================
+   CABEÇALHO
+   ========================================= */
 .profile__header {
   text-align: center;
   position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-bottom: 24px;
-}
-
-.profile__back-btn {
-  position: absolute;
-  left: 0;
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  background: #8B1E3F;
-  color: #ffffff;
-  border: none;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 4px 10px rgba(139, 30, 63, 0.2);
-  font-size: 18px;
-}
-
-.profile__back-btn:hover {
-  background: #E25822;
-  transform: scale(1.05) translateX(-2px);
-  box-shadow: 0 6px 15px rgba(226, 88, 34, 0.3);
-}
-
-.profile__back-btn:active {
-  transform: scale(0.95);
-}
-
-.profile__header-content {
-  text-align: center;
 }
 
 .profile__title {
-  font-size: 32px;
-  font-weight: 800;
+  font-size: 28px;
+  font-weight: 900;
   color: #8B1E3F;
-  margin: 0 0 4px 0;
+  margin: 0 0 2px 0;
+  letter-spacing: -0.5px;
 }
 
 .profile__subtitle {
-  font-size: 14px;
-  font-weight: 500;
+  font-size: 13px;
+  font-weight: 600;
   color: #5a4a46;
   margin: 0;
 }
 
+/* =========================================
+   CARD DE PERFIL
+   ========================================= */
 .profile__card {
-  padding: 32px 24px;
-  border-radius: 24px;
+  padding: 16px 20px 20px 20px; 
+  border-radius: 20px;
   box-shadow: 0 20px 40px rgba(226, 88, 34, 0.08), 0 1px 3px rgba(0, 0, 0, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.9);
   background: rgba(255, 255, 255, 0.98);
@@ -383,25 +389,23 @@ onMounted(async () => {
 .profile__avatar-section {
   display: flex;
   justify-content: center;
-  margin-bottom: 28px;
+  margin-bottom: 16px; 
   position: relative;
 }
 
-/* O SEGREDO ESTÁ AQUI NESSE OVERFLOW: HIDDEN! */
 .profile__avatar {
-  width: 100px;
-  height: 100px;
+  width: 80px; 
+  height: 80px;
   border-radius: 50%;
   background: #ffffff;
   display: flex;
   align-items: center;
   justify-content: center;
   box-shadow: 0 10px 25px rgba(226, 88, 34, 0.2);
-  border: 4px solid #ffffff;
+  border: 3px solid #ffffff;
   overflow: hidden; 
 }
 
-/* A IMAGEM PREENCHE TODO O CÍRCULO */
 .profile__avatar-img {
   width: 100%;
   height: 100%;
@@ -409,21 +413,21 @@ onMounted(async () => {
 }
 
 .profile__info-section {
-  margin-bottom: 28px;
-  padding: 16px 20px;
+  margin-bottom: 16px;
+  padding: 12px 16px;
   background: #fdfaf9;
-  border-radius: 16px;
+  border-radius: 14px;
   border: 1px solid #e8dedc;
 }
 
 .profile__info-item {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 14px;
 }
 
 .profile__info-icon {
-  font-size: 24px;
+  font-size: 20px;
   color: #E25822;
   flex-shrink: 0;
 }
@@ -434,306 +438,280 @@ onMounted(async () => {
 }
 
 .profile__info-label {
-  font-size: 12px;
+  font-size: 11px;
   color: #b5a9a7;
-  font-weight: 600;
+  font-weight: 700;
   margin-bottom: 2px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
 
 .profile__info-value {
-  font-size: 18px;
+  font-size: 16px;
   color: #8B1E3F;
   font-weight: 800;
   word-wrap: break-word;
 }
 
-.profile__form {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-.profile__field {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
+/* =========================================
+   FORMULÁRIO E BOTÕES
+   ========================================= */
+.profile__form { display: flex; flex-direction: column; gap: 14px; }
+.profile__field { display: flex; flex-direction: column; gap: 6px; }
 
 .profile__label {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 13px; font-weight: 700; color: #5a4a46;
+}
+.profile__label-icon { font-size: 14px; color: #E25822; }
+
+.profile__input {
+  width: 100%; padding: 12px 14px; font-size: 14px;
+  border: 2px solid #e8dedc; border-radius: 10px;
+  background: #ffffff; color: #2d2422;
+  transition: all 0.3s ease; font-family: inherit; outline: none;
+}
+.profile__input:focus {
+  border-color: #8B1E3F; box-shadow: 0 0 0 4px rgba(139, 30, 63, 0.1);
+  transform: translateY(-1px);
+}
+.profile__input::placeholder { color: #b5a9a7; font-weight: 500; }
+
+.profile__password-wrapper { position: relative; display: flex; align-items: center; }
+.profile__password-wrapper .profile__input { padding-right: 50px; }
+.profile__toggle-password {
+  position: absolute; right: 12px; background: none; border: none;
+  color: #b5a9a7; cursor: pointer; padding: 8px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.3s ease;
+}
+.profile__toggle-password:hover { color: #E25822; background: rgba(226, 88, 34, 0.1); }
+
+.profile__actions { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
+.profile__save-btn {
+  order: 1; width: 100%; padding: 14px; border: none; border-radius: 10px;
+  background: #E25822; color: #ffffff; font-size: 15px; font-weight: 800;
+  cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px;
+  transition: all 0.3s ease; box-shadow: 0 4px 15px rgba(226, 88, 34, 0.3);
+}
+.profile__save-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(226, 88, 34, 0.4); }
+.profile__save-btn:active:not(:disabled) { transform: translateY(1px); }
+.profile__save-btn:disabled { opacity: 0.6; cursor: not-allowed; filter: grayscale(0.2); box-shadow: none; }
+
+.profile__cancel-btn {
+  order: 2; width: 100%; padding: 12px; border: 2px solid #e8dedc; border-radius: 10px;
+  background: transparent; color: #5a4a46; font-size: 14px; font-weight: 700;
+  cursor: pointer; transition: all 0.3s ease;
+}
+.profile__cancel-btn:hover:not(:disabled) { border-color: #E25822; color: #E25822; background: rgba(226, 88, 34, 0.05); }
+
+/* =========================================
+   HUB DE BANNERS PROMOCIONAIS
+   ========================================= */
+.profile__banners-wrapper {
+  margin-top: auto; 
+  display: flex;
+  flex-direction: column;
+  gap: 10px; 
+}
+
+.promo-banner {
+  border-radius: 16px;
+  padding: 12px 14px; 
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px; 
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.04);
+}
+
+.promo-banner__content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1; 
+  min-width: 0; 
+}
+
+.promo-banner__icon { font-size: 24px; flex-shrink: 0; }
+.promo-banner__icon.float { animation: float-icon 3s ease-in-out infinite; }
+
+.promo-banner__text {
+  flex: 1;
+  min-width: 0;
+}
+
+.promo-banner__text h3 {
+  font-size: 13px;
+  font-weight: 900;
+  margin: 0 0 2px 0;
+  letter-spacing: -0.3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.promo-banner__text p {
+  font-size: 11px;
+  font-weight: 600;
+  margin: 0;
+  color: #5a4a46;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.badge-available {
+  background: #179B78;
+  color: white;
+  font-size: 9px;
+  font-weight: 800;
+  padding: 3px 6px;
+  border-radius: 6px;
+  letter-spacing: 0.5px;
+  display: inline-block;
+}
+
+.promo-banner__btn {
+  border: none;
+  width: 40%; 
+  min-width: 100px;
+  padding: 12px 10px; 
+  border-radius: 10px;
+  font-weight: 800;
+  font-size: 12px;
+  cursor: pointer;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center; 
+  gap: 6px;
+  transition: all 0.2s ease;
+}
+
+.promo-banner__btn:active { transform: scale(0.95); }
+
+/* Variação 1: E-book Hotmart */
+.promo-banner--ebook { background: rgba(255, 255, 255, 0.9); border: 1px solid rgba(226, 88, 34, 0.1); backdrop-filter: blur(10px); }
+.promo-banner--ebook h3 { color: #2d2422; }
+.promo-banner__btn--ebook { background: rgba(23, 155, 120, 0.15); color: #0c5c46; }
+.promo-banner__btn--ebook:hover { background: rgba(23, 155, 120, 0.25); }
+
+/* Variação 2: Ingresso */
+.promo-banner--ticket { background: linear-gradient(135deg, #fffafa 0%, #fcedea 100%); border: 1px solid rgba(139, 30, 63, 0.15); }
+.promo-banner--ticket h3 { color: #8B1E3F; }
+.promo-banner__btn--primary { background: #8B1E3F; color: #fff; box-shadow: 0 4px 10px rgba(139, 30, 63, 0.2); }
+.promo-banner__btn--primary:hover { transform: translateY(-1px); box-shadow: 0 6px 15px rgba(139, 30, 63, 0.3); }
+
+/* Variação 3: Café */
+.promo-banner--coffee { background: linear-gradient(135deg, #fff0eb 0%, #ffe4d6 100%); border: 1px solid rgba(226, 88, 34, 0.2); }
+.promo-banner--coffee h3 { color: #E25822; }
+.promo-banner__btn--accent { background: #E25822; color: #fff; box-shadow: 0 4px 10px rgba(226, 88, 34, 0.3); }
+.promo-banner__btn--accent:hover { transform: translateY(-1px); box-shadow: 0 6px 15px rgba(226, 88, 34, 0.4); }
+
+.heart-icon { font-size: 12px; }
+.promo-banner__btn--accent:hover .heart-icon { animation: beat 1s infinite; }
+
+/* =========================================
+   LOGOUT
+   ========================================= */
+.profile__logout-wrapper {
+  margin-top: 16px;
+  display: flex;
+  justify-content: center;
+}
+
+.profile__logout-btn {
+  background: transparent;
+  border: none;
+  color: #b5a9a7;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 14px;
-  font-weight: 600;
-  color: #5a4a46;
-}
-
-.profile__label-icon {
-  font-size: 15px;
-  color: #E25822;
-}
-
-.profile__input {
-  width: 100%;
-  padding: 14px 16px;
-  font-size: 15px;
-  border: 2px solid #e8dedc;
-  border-radius: 12px;
-  background: #ffffff;
-  color: #2d2422;
+  padding: 8px 16px;
+  border-radius: 20px;
   transition: all 0.3s ease;
-  font-family: inherit;
-  outline: none;
 }
 
-.profile__input:focus {
-  border-color: #8B1E3F;
-  box-shadow: 0 0 0 4px rgba(139, 30, 63, 0.1);
-  transform: translateY(-1px);
+.profile__logout-btn:hover {
+  color: #8B1E3F;
+  background: rgba(139, 30, 63, 0.05);
 }
 
-.profile__input::placeholder {
+/* =========================================
+   REDES SOCIAIS (BASTIDORES)
+   ========================================= */
+.profile__social-wrapper {
+  margin-top: 24px;
+  text-align: center;
+}
+
+.social-title {
+  font-size: 11px;
+  font-weight: 800;
   color: #b5a9a7;
-  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 14px;
 }
 
-.profile__password-wrapper {
-  position: relative;
+.social-links {
   display: flex;
-  align-items: center;
+  justify-content: center;
+  gap: 16px;
 }
 
-.profile__password-wrapper .profile__input {
-  padding-right: 50px;
-}
-
-.profile__toggle-password {
-  position: absolute;
-  right: 12px;
-  background: none;
-  border: none;
-  color: #b5a9a7;
-  cursor: pointer;
-  padding: 8px;
+.social-btn {
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.3s ease;
-}
-
-.profile__toggle-password:hover {
-  color: #E25822;
-  background: rgba(226, 88, 34, 0.1);
-}
-
-.profile__hint {
-  font-size: 12px;
-  color: #b5a9a7;
-  margin: 0;
-  font-weight: 500;
-}
-
-.profile__message {
-  padding: 14px 16px;
-  border-radius: 12px;
-  margin-bottom: 20px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 14px;
-  font-weight: 600;
-}
-
-.profile__message--error {
-  background: #fdf2f2;
-  border: 1px solid #e27d72;
-  color: #d13d3d;
-}
-
-.profile__message--success {
-  background: #fdfaf9;
-  border: 1px solid #e8dedc;
-  color: #8B1E3F; 
-}
-
-.profile__actions {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  margin-top: 12px;
-}
-
-.profile__save-btn {
-  order: 1;
-  width: 100%;
-  padding: 16px;
-  border: none;
-  border-radius: 12px;
-  background: #E25822;
   color: #ffffff;
-  font-size: 16px;
-  font-weight: 800;
-  letter-spacing: 0.5px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 4px 15px rgba(226, 88, 34, 0.3);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  text-decoration: none;
 }
 
-.profile__save-btn:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 10px 25px rgba(226, 88, 34, 0.4);
+.social-btn--insta {
+  background: linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%);
+  box-shadow: 0 4px 10px rgba(220, 39, 67, 0.3);
 }
 
-.profile__save-btn:active:not(:disabled) {
-  transform: translateY(0) scale(0.98);
+.social-btn--youtube {
+  background: #FF0000;
+  box-shadow: 0 4px 10px rgba(255, 0, 0, 0.3);
 }
 
-.profile__save-btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-  filter: grayscale(0.2);
+.social-btn:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 6px 15px rgba(0, 0, 0, 0.15);
 }
 
-.profile__cancel-btn {
-  order: 2;
-  width: 100%;
-  padding: 14px;
-  border: 2px solid #e8dedc;
-  border-radius: 12px;
-  background: transparent;
-  color: #5a4a46;
-  font-size: 15px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
+/* =========================================
+   ANIMAÇÕES E UTILITÁRIOS
+   ========================================= */
+@keyframes float-icon { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+@keyframes beat { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.2); } }
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+@keyframes slideUpFade { to { opacity: 1; transform: translateY(0); } }
 
-.profile__cancel-btn:hover:not(:disabled) {
-  border-color: #E25822;
-  color: #E25822;
-  background: rgba(226, 88, 34, 0.05);
-}
+.profile__message { padding: 12px 14px; border-radius: 10px; margin-bottom: 14px; display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; }
+.profile__message--error { background: #fdf2f2; border: 1px solid #e27d72; color: #d13d3d; }
+.profile__message--success { background: #fdfaf9; border: 1px solid #e8dedc; color: #8B1E3F; }
 
-.profile__cancel-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.profile__spinner {
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-
-.profile__stats {
-  padding: 24px;
-  border-radius: 24px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.02);
-  border: 1px solid rgba(255, 255, 255, 0.9);
-  background: rgba(255, 255, 255, 0.8);
-  backdrop-filter: blur(10px);
-}
-
-.profile__stats-title {
-  font-size: 18px;
-  font-weight: 800;
-  color: #8B1E3F;
-  margin: 0 0 20px 0;
-  text-align: center;
-}
-
-.profile__stats-loading {
-  text-align: center;
-  padding: 20px;
-  color: #b5a9a7;
-  font-weight: 500;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-}
-
-.profile__stats-grid {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 12px;
-}
-
-.profile__stat-item {
-  text-align: center;
-  padding: 16px;
-  background: #ffffff;
-  border-radius: 16px;
-  border: 1px solid #e8dedc;
-  transition: transform 0.3s ease;
-}
-
-.profile__stat-item:hover {
-  transform: translateY(-2px);
-  border-color: #E25822;
-  box-shadow: 0 4px 12px rgba(226, 88, 34, 0.08);
-}
-
-.profile__stat-value {
-  font-size: 26px;
-  font-weight: 900;
-  color: #E25822; 
-  margin-bottom: 4px;
-  letter-spacing: -0.5px;
-}
-
-.profile__stat-label {
-  font-size: 12px;
-  color: #5a4a46;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-@media (min-width: 640px) {
-  .profile__stats-grid {
-    grid-template-columns: repeat(3, 1fr);
-    gap: 16px;
-  }
-
-  .profile__stat-value { font-size: 30px; }
-  .profile__stat-label { font-size: 11px; }
-}
+.profile__spinner { animation: spin 1s linear infinite; }
+.fade-enter-active, .fade-leave-active { transition: opacity 0.5s ease, transform 0.5s ease; }
+.fade-enter-from { opacity: 0; transform: translateY(15px); }
+.fade-leave-to { opacity: 0; transform: translateY(-15px); }
 
 @media (min-width: 768px) {
-  .profile { padding: 32px; }
-  .profile__container { max-width: 600px; }
-  .profile__content { gap: 32px; }
-  .profile__title { font-size: 36px; }
-  .profile__subtitle { font-size: 16px; }
-  .profile__card { padding: 48px; }
-  .profile__avatar-section { margin-bottom: 32px; }
-  .profile__avatar { width: 120px; height: 120px; }
-  .profile__avatar-icon { font-size: 52px; }
-  .profile__info-section { margin-bottom: 32px; padding: 20px 24px; }
-  .profile__info-icon { font-size: 28px; }
-  .profile__form { gap: 24px; }
-  .profile__input { padding: 16px 18px; font-size: 16px; }
-  .profile__stats { padding: 32px; }
-  .profile__stats-title { font-size: 20px; margin-bottom: 24px; }
-  .profile__back-btn { width: 48px; height: 48px; font-size: 20px; }
+  .profile { padding: 40px 32px 140px 32px; } 
+  .profile__container { max-width: 480px; } 
+  .profile__title { font-size: 32px; }
 }
-
-.fade-enter-active,
-.fade-leave-active {
-  transition: opacity 0.6s cubic-bezier(0.4, 0, 0.2, 1), transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.fade-enter-from { opacity: 0; transform: translateY(20px); }
-.fade-leave-to { opacity: 0; transform: translateY(-20px); }
 </style>

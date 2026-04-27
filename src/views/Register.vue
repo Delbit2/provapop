@@ -2,7 +2,6 @@
   <div class="register">
     <Transition name="fade" appear>
       <div class="register__container">
-        
         <div class="register__header">
           <div class="register__logo-wrapper">
             <img src="@/assets/logo_login.png" alt="ProvaPop! Logo" class="register__logo" />
@@ -22,10 +21,11 @@
                 Como quer ser chamado?
               </label>
               <input
-                v-model="form.name"
+                v-model.trim="form.name"
                 type="text"
                 class="register__input"
                 placeholder="ex: Fernando"
+                autocomplete="nickname"
                 required
               />
             </div>
@@ -36,10 +36,11 @@
                 Seu E-mail
               </label>
               <input
-                v-model="form.email"
+                v-model.trim="form.email"
                 type="email"
                 class="register__input"
                 placeholder="ex: futuro.calouro@email.com"
+                autocomplete="email"
                 required
               />
             </div>
@@ -55,6 +56,7 @@
                   :type="showPassword ? 'text' : 'password'"
                   class="register__input"
                   placeholder="••••••••"
+                  autocomplete="new-password"
                   required
                 />
                 <button
@@ -67,19 +69,19 @@
               </div>
             </div>
 
-            <div v-if="authStore.error" class="register__error">
+            <div v-if="errorMessage" class="register__error">
               <font-awesome-icon icon="exclamation-circle" />
-              {{ authStore.error }}
+              {{ errorMessage }}
             </div>
 
             <div class="register__action">
               <button
                 type="submit"
-                :disabled="authStore.loading"
+                :disabled="loading"
                 class="register__submit-btn"
               >
-                <font-awesome-icon v-if="authStore.loading" icon="circle-notch" class="register__spinner" />
-                {{ authStore.loading ? 'Preparando...' : 'Cadastrar!' }}
+                <font-awesome-icon v-if="loading" icon="circle-notch" class="register__spinner" />
+                {{ loading ? 'Afinando...' : 'Cadastrar!' }}
               </button>
             </div>
           </form>
@@ -97,10 +99,9 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import Card from '@/components/Card.vue'
-import { useAuthStore } from '@/stores/auth'
+import { supabase } from '@/supabase'
 
 const router = useRouter()
-const authStore = useAuthStore()
 
 const form = ref({
   name: '',
@@ -109,13 +110,59 @@ const form = ref({
 })
 
 const showPassword = ref(false)
+const loading = ref(false)
+const errorMessage = ref('')
 
 async function handleRegister() {
   try {
-    await authStore.register(form.value.name, form.value.email, form.value.password)
-    // A store de auth normalmente redireciona após o sucesso
-  } catch (error) {
-    console.error('Registration error:', error)
+    loading.value = true
+    errorMessage.value = ''
+
+    const name = form.value.name.trim()
+    const email = form.value.email.trim().toLowerCase()
+    const password = form.value.password
+
+    if (!name || !email || !password) {
+      errorMessage.value = 'Preencha nome, e-mail e senha.'
+      return
+    }
+
+    if (password.length < 6) {
+      errorMessage.value = 'Sua senha secreta deve ter no mínimo 6 caracteres.'
+      return
+    }
+
+    const { error: authError } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          nickname: name,
+          nome: name
+        }
+      }
+    })
+
+    if (authError) throw authError
+
+    alert('Passe VIP criado com sucesso! Faça seu login para jogar.')
+    router.push('/login')
+  } catch (error: any) {
+    console.error('Erro de registro:', error)
+
+    const message = String(error?.message || '')
+
+    if (message.includes('User already registered')) {
+      errorMessage.value = 'Este e-mail já possui um Passe VIP!'
+    } else if (message.includes('Password should be at least')) {
+      errorMessage.value = 'Sua senha secreta deve ter no mínimo 6 caracteres.'
+    } else if (message.includes('duplicate key value')) {
+      errorMessage.value = 'Já existe um cadastro com esses dados.'
+    } else {
+      errorMessage.value = 'Não foi possível criar sua conta agora. Tente novamente.'
+    }
+  } finally {
+    loading.value = false
   }
 }
 
@@ -125,6 +172,7 @@ function goToLogin() {
 </script>
 
 <style scoped>
+/* SEU CSS ESTÁ PERFEITO E FOI MANTIDO INTACTO! */
 .register {
   min-height: 100vh;
   display: flex;

@@ -2,72 +2,25 @@
   <div class="quiz">
     <div class="quiz__container animate-fade-down">
       <Card variant="elevated" class="quiz__card">
-        <!-- Loading State -->
         <div v-if="loading" class="quiz__loading">
           <div class="quiz__loading-spinner"></div>
           <p>Preparando a arena...</p>
         </div>
 
-        <!-- Error State -->
         <div v-else-if="error" class="quiz__error">
           <font-awesome-icon icon="exclamation-triangle" class="quiz__error-icon" />
           <p>{{ error }}</p>
-          <Button variant="primary" @click="() => loadQuestions()">Tentar Novamente</Button>
+          <Button variant="primary" @click="loadQuestions(true)">Tentar Novamente</Button>
         </div>
 
-        <!-- No Questions State -->
         <div v-else-if="allQuestions.length === 0" class="quiz__empty">
           <font-awesome-icon icon="inbox" class="quiz__empty-icon" />
           <p>Nenhuma missão disponível aqui.</p>
           <p class="quiz__empty-hint">Aguardando o Diretor adicionar questões na base.</p>
-          <Button variant="primary" @click="goToHome">Voltar ao QG</Button>
+          <Button variant="primary" @click="goToHome">Voltar ao Camarim</Button>
         </div>
 
-        <!-- Empty Filter State -->
-        <div v-else-if="filteredQuestions.length === 0 && allQuestions.length > 0" class="quiz__empty-filter">
-          <font-awesome-icon 
-            :icon="viewMode === 'unanswered' ? 'trophy' : 'question-circle'" 
-            class="quiz__empty-filter-icon" 
-            :class="{ 'gold-icon': viewMode === 'unanswered' }"
-          />
-          <p>
-            <strong class="quiz__empty-title">
-              {{ viewMode === 'unanswered' ? 'Missão Cumprida!' : 'Área Limpa' }}
-            </strong>
-          </p>
-          <p class="quiz__empty-subtitle">
-            {{ viewMode === 'unanswered' 
-              ? 'Você gabaritou todas as questões disponíveis desta categoria!' 
-              : 'Você ainda não respondeu nenhuma questão. Que tal começar agora?' 
-            }}
-          </p>
-          <div class="quiz__empty-filter-actions">
-            <Button 
-              v-if="viewMode === 'unanswered' && answeredQuestions.length > 0"
-              variant="primary" 
-              @click="setViewMode('answered')"
-            >
-              Revisar Questões
-            </Button>
-            <Button 
-              v-else-if="viewMode === 'answered' && unansweredQuestions.length > 0"
-              variant="primary" 
-              @click="setViewMode('unanswered')"
-            >
-              Ir para as Inéditas
-            </Button>
-            <Button 
-              variant="secondary" 
-              @click="goToHome"
-            >
-              Voltar ao Início
-            </Button>
-          </div>
-        </div>
-
-        <!-- Quiz Content -->
         <template v-else-if="currentQuestion">
-          <!-- CABEÇALHO MAIS COMPACTO -->
           <div class="quiz__header animate-slide-up">
             <button class="quiz__back-btn" @click="goToHome" title="Voltar">
               <font-awesome-icon icon="arrow-left" />
@@ -83,10 +36,9 @@
             </div>
           </div>
 
-          <!-- 🚀 BARRA DE PROGRESSO PREMIUM -->
           <div class="quiz__progress-container animate-slide-up" style="animation-delay: 0.1s;">
             <div class="quiz__progress-header">
-              <span class="quiz__progress-text">Questão {{ currentQuestionIndex + 1 }} de {{ filteredQuestions.length }}</span>
+              <span class="quiz__progress-text">Questão {{ currentQuestionIndex + 1 }} de {{ allQuestions.length }}</span>
               <span class="quiz__progress-percentage">{{ porcentagemProgresso }}%</span>
             </div>
             <div class="quiz__progress-bar-bg">
@@ -94,77 +46,36 @@
             </div>
           </div>
 
-          <!-- Question Filter Tabs -->
-          <div class="quiz__filter-tabs animate-slide-up" style="animation-delay: 0.15s;">
-            <button
-              class="quiz__filter-tab"
-              :class="{ 'quiz__filter-tab--active': viewMode === 'unanswered' }"
-              @click="setViewMode('unanswered')"
-            >
-              <font-awesome-icon icon="compass" />
-              Inéditas
-              <span class="quiz__filter-count">{{ unansweredQuestions.length }}</span>
-            </button>
-            <button
-              class="quiz__filter-tab"
-              :class="{ 'quiz__filter-tab--active': viewMode === 'answered' }"
-              @click="setViewMode('answered')"
-            >
-              <font-awesome-icon icon="history" />
-              Respondidas
-              <span class="quiz__filter-count">{{ answeredQuestions.length }}</span>
-            </button>
-          </div>
-
-          <!-- Navigation Controls -->
-          <div class="quiz__navigation animate-slide-up" style="animation-delay: 0.2s;">
-            <button
-              class="quiz__nav-btn"
-              :disabled="currentQuestionIndex === 0"
-              @click="previousQuestion"
-            >
-              <font-awesome-icon icon="chevron-left" />
-            </button>
-            <div class="quiz__nav-info">
-              {{ currentQuestionIndex + 1 }} / {{ filteredQuestions.length }}
-            </div>
-            <button
-              class="quiz__nav-btn"
-              :disabled="currentQuestionIndex >= filteredQuestions.length - 1"
-              @click="nextQuestion"
-            >
-              <font-awesome-icon icon="chevron-right" />
-            </button>
-          </div>
-
-          <div class="quiz__content animate-slide-up" style="animation-delay: 0.25s;">
-            <!-- Music Info Section -->
+          <div class="quiz__content animate-slide-up" style="animation-delay: 0.2s;">
             <div class="quiz__music-info">
               <div class="quiz__audio-section">
-                <button 
-                  class="quiz__play-btn" 
-                  @click="playYoutube" 
+                <button
+                  class="quiz__play-btn"
+                  @click="playYoutube"
                   :class="{ 'quiz__play-btn--playing': isPlaying }"
                   :disabled="!youtubeVideoId || isPlaying"
                 >
-                  <font-awesome-icon :icon="isPlaying ? 'music' : 'play'" class="quiz__play-icon" :class="{ 'fa-beat': isPlaying }" />
+                  <font-awesome-icon
+                    :icon="isPlaying ? 'music' : 'play'"
+                    class="quiz__play-icon"
+                    :class="{ 'fa-beat': isPlaying }"
+                  />
                 </button>
+
                 <div class="quiz__audio-info">
-                  <!-- 🎯 TÍTULO DA MÚSICA -->
                   <div class="quiz__audio-title">
-                    {{ currentQuestion.artist }} - {{ currentQuestion.song_title }}
+                    {{ currentQuestion.autor }} - {{ currentQuestion.titulo }}
                   </div>
+
                   <span v-if="isPlaying" class="quiz__playing-text">
                     Tocando agora...
                   </span>
-                  
-                  <!-- BARRINHA DE PROGRESSO DO AUDIO -->
+
                   <div class="quiz__audio-progress" v-if="isPlaying && audioDuration > 0">
                     <div class="quiz__audio-progress-bar" :style="{ width: `${audioProgress}%` }"></div>
                   </div>
 
-                   <!-- Player do YouTube -->
-                  <iframe 
+                  <iframe
                     ref="youtubeIframe"
                     v-show="youtubeVideoId"
                     :src="youtubeUrl"
@@ -174,49 +85,46 @@
                 </div>
               </div>
 
-              <!-- Year Information -->
-              <div class="quiz__years-info" v-if="currentQuestion.composition_year || currentQuestion.enem_year">
-                <div class="quiz__year-badge" v-if="currentQuestion.composition_year">
+              <div class="quiz__years-info" v-if="currentQuestion.ano_lancamento || currentQuestion.ano_prova">
+                <div class="quiz__year-badge" v-if="currentQuestion.ano_lancamento">
                   <font-awesome-icon icon="calendar-alt" />
                   <span class="quiz__year-label">Lançamento:</span>
-                  <span class="quiz__year-value">{{ currentQuestion.composition_year }}</span>
+                  <span class="quiz__year-value">{{ currentQuestion.ano_lancamento }}</span>
                 </div>
-                <div class="quiz__year-badge quiz__year-badge--enem" v-if="currentQuestion.enem_year">
+
+                <div class="quiz__year-badge quiz__year-badge--enem" v-if="currentQuestion.ano_prova">
                   <font-awesome-icon icon="graduation-cap" />
-                  <span class="quiz__year-label">ENEM:</span>
-                  <span class="quiz__year-value">{{ currentQuestion.enem_year }}</span>
+                  <span class="quiz__year-label">Prova:</span>
+                  <span class="quiz__year-value">{{ currentQuestion.ano_prova }}</span>
                 </div>
               </div>
-            
-            <!-- 📖 LETRA DA MÚSICA - PAPEL PÓLEN PREMIUM -->
-            <div class="quiz__lyrics" v-if="currentQuestion.lyrics">
+            </div>
+
+            <div class="quiz__lyrics" v-if="currentQuestion.trecho_letra">
               <font-awesome-icon icon="quote-left" class="quiz__quote-icon" />
               <div class="quiz__lyrics-text">
                 <p v-for="(line, index) in lyricsLines" :key="index">{{ line }}</p>
               </div>
             </div>
 
-            <!-- 📝 CRÉDITOS DA CANÇÃO (FLUTUANTES PREMIUM) -->
-            <div class="quiz__credits animate-slide-up" v-if="currentQuestion.credits">
+            <div class="quiz__credits animate-slide-up" v-if="currentQuestion.creditos">
               <div class="quiz__credits-pill">
-                {{ currentQuestion.credits }}
+                {{ currentQuestion.creditos }}
               </div>
             </div>
 
-            <!-- 🎯 ENUNCIADO -->
-            <div class="quiz__statement">
-              <p class="quiz__statement-text">{{ currentQuestion.statement }}</p>
+            <div class="quiz__statement" v-if="currentQuestion.enunciado">
+              <p class="quiz__statement-text">{{ currentQuestion.enunciado }}</p>
             </div>
 
-            <!-- 🎯 ALTERNATIVAS -->
             <div class="quiz__options">
               <OptionButton
                 v-for="(option, index) in questionOptions"
-                :key="index"
+                :key="option.label"
                 :label="option.label"
                 :selected="selectedOption === index"
                 @click="selectOption(index)"
-                :disabled="answered"
+                :disabled="answered || isChecking || limiteDiarioAtingido"
                 :correct="answered && option.isCorrect"
                 :wrong="answered && selectedOption === index && !option.isCorrect"
               >
@@ -226,24 +134,23 @@
           </div>
 
           <div class="quiz__actions" v-if="selectedOption !== null && !answered">
-            <!-- BOTÃO TURQUESA SURPRESA -->
-            <Button 
-              variant="primary" 
-              size="lg" 
-              full-width 
+            <Button
+              variant="primary"
+              size="lg"
+              full-width
               @click="confirmAnswer"
               class="btn-turquesa"
+              :disabled="isChecking"
             >
-              Confirmar Resposta
+              {{ isChecking ? 'Conferindo a partitura... 🎼' : 'Confirmar Resposta' }}
             </Button>
           </div>
 
-          <!-- Skip Button - LARANJINHA CLARO -->
           <div class="quiz__skip-action" v-if="!answered && selectedOption === null">
-            <Button 
-              variant="secondary" 
-              size="md" 
-              full-width 
+            <Button
+              variant="secondary"
+              size="md"
+              full-width
               @click="nextQuestion"
               class="btn-ghost-orange"
             >
@@ -252,34 +159,45 @@
             </Button>
           </div>
 
-            <div class="quiz__feedback" v-if="answered">
-              <div v-if="alreadyAnswered" class="quiz__already-answered-warning">
-                <font-awesome-icon icon="info-circle" class="quiz__warning-icon" />
-                <p>
-                  <strong>Modo Revisão Ativo</strong><br>
-                  Sua resposta original foi <strong>{{ previousResult ? 'correta' : 'incorreta' }}</strong>.
-                  Esta tentativa não altera sua pontuação no ranking.
-                </p>
-              </div>
-              
-              <div class="quiz__feedback-content" :class="isCorrect ? 'quiz__feedback--correct' : 'quiz__feedback--wrong'">
-                <font-awesome-icon 
-                  :icon="isCorrect ? 'check-circle' : 'times-circle'" 
-                  class="quiz__feedback-icon"
-                />
-                <div class="quiz__feedback-text">
-                  <strong>{{ isCorrect ? 'Excelente! 🎉' : 'Quase lá!' }}</strong>
-                  <p v-if="!isCorrect">A resposta certa era a alternativa <b>{{ correctAnswer }}</b>.</p>
-                  
-                  <div class="quiz__points-badge" v-if="pointsEarned && pointsValue !== 0">
-                    <font-awesome-icon icon="star" class="star-icon" />
-                    <span>{{ pointsValue > 0 ? '+' : '' }}{{ pointsValue }} pontos conquistados!</span>
-                  </div>
+          <div class="quiz__feedback" v-if="answered">
+            <div
+              v-if="limiteDiarioAtingido"
+              class="quiz__already-answered-warning"
+              style="background-color: #FFF3CD; color: #856404; border: 1px solid #FFEEBA; margin-bottom: 16px;"
+            >
+              <font-awesome-icon icon="lock" class="quiz__warning-icon" />
+              <p>
+                <strong>Missão do dia concluída! 🛑</strong><br>
+                Siga para o <strong>Estúdio</strong> para continuar sua experiência. Volte amanhã para novos shows!
+              </p>
+            </div>
+
+            <div v-if="alreadyAnswered && !limiteDiarioAtingido" class="quiz__already-answered-warning">
+              <font-awesome-icon icon="info-circle" class="quiz__warning-icon" />
+              <p>
+                <strong>Modo Revisão Ativo (Estúdio)</strong><br>
+                Sua resposta original foi <strong>{{ previousResult ? 'correta' : 'incorreta' }}</strong>.
+                Esta tentativa serve para você treinar e consolidar seu repertório.
+              </p>
+            </div>
+
+            <div class="quiz__feedback-content" :class="isCorrect ? 'quiz__feedback--correct' : 'quiz__feedback--wrong'">
+              <font-awesome-icon
+                :icon="isCorrect ? 'check-circle' : 'times-circle'"
+                class="quiz__feedback-icon"
+              />
+              <div class="quiz__feedback-text">
+                <strong>{{ isCorrect ? 'Excelente! 🎉' : 'Quase lá!' }}</strong>
+                <p v-if="!isCorrect">A resposta certa era a alternativa <b>{{ correctAnswer }}</b>.</p>
+
+                <div class="quiz__points-badge" v-if="pointsEarned && pointsValue !== 0">
+                  <font-awesome-icon icon="star" class="star-icon" />
+                  <span>{{ pointsValue > 0 ? '+' : '' }}{{ pointsValue }} pontos conquistados!</span>
                 </div>
               </div>
+            </div>
 
-            <!-- Comment Section -->
-            <div class="quiz__comment-section" v-if="isCorrect && currentQuestion.comment">
+            <div class="quiz__comment-section" v-if="isCorrect && currentQuestion.comentario">
               <div class="quiz__comment-header">
                 <div class="icon-wrapper">
                   <font-awesome-icon icon="key" class="quiz__comment-icon" />
@@ -287,44 +205,49 @@
                 <h3 class="quiz__comment-title">Chave da Questão</h3>
               </div>
               <div class="quiz__comment-content">
-                <p>{{ currentQuestion.comment }}</p>
+                <p>{{ currentQuestion.comentario }}</p>
               </div>
             </div>
 
-              <!-- Curiosidade Section -->
-              <div class="quiz__curiosity-section" v-if="isCorrect && currentQuestion.curiosity">
-                <div class="quiz__curiosity-header">
-                  <div class="icon-wrapper-gold">
-                    <font-awesome-icon icon="lightbulb" class="quiz__curiosity-icon" />
-                  </div>
-                  <h3 class="quiz__curiosity-title">Você Sabia?</h3>
+            <div class="quiz__curiosity-section" v-if="isCorrect && currentQuestion.curiosidade">
+              <div class="quiz__curiosity-header">
+                <div class="icon-wrapper-gold">
+                  <font-awesome-icon icon="lightbulb" class="quiz__curiosity-icon" />
                 </div>
-                <div class="quiz__curiosity-content">
-                  <p>{{ currentQuestion.curiosity }}</p>
-                </div>
+                <h3 class="quiz__curiosity-title">Você Sabia?</h3>
               </div>
+              <div class="quiz__curiosity-content">
+                <p>{{ currentQuestion.curiosidade }}</p>
+              </div>
+            </div>
+
             <div class="quiz__feedback-actions">
-              <Button 
+              <Button
                 v-if="hasNextQuestion"
-                variant="primary" 
-                size="lg" 
-                full-width 
-                @click="nextQuestion" 
+                variant="primary"
+                size="lg"
+                full-width
+                @click="nextQuestion"
                 class="quiz__next-btn btn-premium"
               >
                 Próxima Questão <font-awesome-icon icon="arrow-right" />
               </Button>
-              <Button 
+
+              <Button
                 v-else
-                variant="primary" 
-                size="lg" 
-                full-width 
-                @click="finishQuiz" 
+                variant="primary"
+                size="lg"
+                full-width
+                @click="finishQuiz"
                 class="quiz__finish-btn btn-premium"
+                :disabled="isFinishing"
               >
-                Finalizar Desafio <font-awesome-icon icon="flag-checkered" />
+                {{ isFinishing ? 'Salvando...' : 'Finalizar Desafio' }}
+                <font-awesome-icon icon="flag-checkered" v-if="!isFinishing" />
               </Button>
-            </div></div></div></template>
+            </div>
+          </div>
+        </template>
       </Card>
     </div>
   </div>
@@ -337,65 +260,155 @@ import confetti from 'canvas-confetti'
 import Card from '@/components/Card.vue'
 import Button from '@/components/Button.vue'
 import OptionButton from '@/components/OptionButton.vue'
-import { api } from '@/services/api'
+import { api, type DailyQuestionResponse, type CheckAnswerResponse } from '@/services/api'
+import { useQuizStore } from '@/stores/quiz'
+import { useAuthStore } from '@/stores/auth'
+
+type ApiQuestion = {
+  id: number
+  titulo: string
+  autor: string
+  musica_url: string
+  ano_lancamento?: number | null
+  ano_prova?: number | null
+  trecho_letra?: string | null
+  enunciado: string
+  a?: string | null
+  b?: string | null
+  c?: string | null
+  d?: string | null
+  e?: string | null
+  alternativa_correta?: string | null
+  comentario?: string | null
+  curiosidade?: string | null
+  creditos?: string | null
+  matriz_enem?: string | null
+  prova?: string | null
+  disciplina?: string | null
+  already_answered?: boolean
+  previous_result?: boolean | null
+  previous_answer?: string | null
+}
 
 const router = useRouter()
 const route = useRoute()
+const quizStore = useQuizStore()
+const authStore = useAuthStore()
 
-const category = computed(() => (route.params.category as string) || 'enem')
+const category = computed(() => (route.params.prova as string) || 'enem')
 
 const categoryNames: Record<string, string> = {
-  'enem': 'Missão ENEM',
-  'fuvest': 'Missão FUVEST',
-  'unicamp': 'Missão UNICAMP',
-  'outros': 'Treino Livre',
-  'foco': 'Da Terra à Lua'
+  enem: 'Missão ENEM',
+  fuvest: 'Missão FUVEST',
+  unicamp: 'Missão UNICAMP',
+  outros: 'Treino Livre',
+  foco: 'Da Terra à Lua'
 }
 
-const categoryName = computed(() => categoryNames[category.value] || 'Desafio')
+const categoryName = computed(() => categoryNames[category.value] || 'Desafio Diário')
 
-// State
 const loading = ref(true)
 const error = ref<string | null>(null)
-const allQuestions = ref<any[]>([]) 
+const allQuestions = ref<ApiQuestion[]>([])
 const currentQuestionIndex = ref(0)
 const selectedOption = ref<number | null>(null)
 const answered = ref(false)
 const isCorrect = ref(false)
 const correctAnswer = ref('')
+const isFinishing = ref(false)
+const isChecking = ref(false)
+const limiteDiarioAtingido = ref(false)
 
-// VARIAVEIS DO PLAYER
 const isPlaying = ref(false)
 const youtubeIframe = ref<HTMLIFrameElement | null>(null)
 const audioProgress = ref(0)
 const audioDuration = ref(0)
-let progressInterval: any = null
+let progressInterval: ReturnType<typeof setInterval> | null = null
 
-// Mágicas do YouTube
+const alreadyAnswered = ref(false)
+const previousResult = ref<boolean | null>(null)
+const pointsEarned = ref(false)
+const pointsValue = ref(0)
+const sessionScore = ref(0)
+const displayedQuestion = ref<ApiQuestion | null>(null)
+const partidaId = ref<number | null>(null)
+
+const currentQuestion = computed(() => {
+  if (allQuestions.value.length === 0) return null
+
+  const index = Math.min(currentQuestionIndex.value, allQuestions.value.length - 1)
+  const question = allQuestions.value[index] || null
+
+  if (answered.value && displayedQuestion.value) {
+    return displayedQuestion.value
+  }
+
+  return question
+})
+
+const porcentagemProgresso = computed(() => {
+  if (allQuestions.value.length === 0) return 0
+  return Math.round(((currentQuestionIndex.value + 1) / allQuestions.value.length) * 100)
+})
+
+const hasNextQuestion = computed(() => currentQuestionIndex.value < allQuestions.value.length - 1)
+
+const lyricsLines = computed(() => {
+  if (!currentQuestion.value?.trecho_letra) return []
+  return currentQuestion.value.trecho_letra
+    .split('\n')
+    .filter((line: string) => line.trim())
+})
+
+const questionOptions = computed(() => {
+  if (!currentQuestion.value) return []
+
+  const q = currentQuestion.value
+  const options = [
+    { label: 'A', text: q.a || '', isCorrect: false },
+    { label: 'B', text: q.b || '', isCorrect: false },
+    { label: 'C', text: q.c || '', isCorrect: false },
+    { label: 'D', text: q.d || '', isCorrect: false },
+    { label: 'E', text: q.e || '', isCorrect: false }
+  ].filter((opt) => opt.text !== '')
+
+  if (answered.value && correctAnswer.value) {
+    return options.map((opt) => ({
+      ...opt,
+      isCorrect: opt.label === correctAnswer.value
+    }))
+  }
+
+  return options
+})
+
 const youtubeVideoId = computed(() => {
-  const rawData = currentQuestion.value?.music_drive_url
+  const rawData = currentQuestion.value?.musica_url
   if (!rawData) return null
+
   const firstPart = rawData.split(',')[0].trim()
+
   if (firstPart.includes('youtu')) {
     const regExp = /^.*(youtu\.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/
     const match = firstPart.match(regExp)
-    return (match && match[2].length === 11) ? match[2] : null
+    return match && match[2].length === 11 ? match[2] : null
   }
+
   return firstPart.length === 11 ? firstPart : null
 })
 
 const youtubeStartTime = computed(() => {
-  const rawData = currentQuestion.value?.music_drive_url
+  const rawData = currentQuestion.value?.musica_url
   if (!rawData) return ''
   const parts = rawData.split(',')
-  return parts[1] ? parts[1].trim() : '' 
+  return parts[1] ? parts[1].trim() : ''
 })
 
 const youtubeEndTime = computed(() => {
-  const rawData = currentQuestion.value?.music_drive_url
+  const rawData = currentQuestion.value?.musica_url
   if (!rawData) return ''
   const parts = rawData.split(',')
-  return parts[2] ? parts[2].trim() : '' 
+  return parts[2] ? parts[2].trim() : ''
 })
 
 const youtubeUrl = computed(() => {
@@ -403,107 +416,57 @@ const youtubeUrl = computed(() => {
   return `https://www.youtube.com/embed/${youtubeVideoId.value}?enablejsapi=1&controls=0&playsinline=1&start=${youtubeStartTime.value}&end=${youtubeEndTime.value}`
 })
 
-const alreadyAnswered = ref(false)
-const previousResult = ref<boolean | null>(null)
-const pointsEarned = ref(false)
-const pointsValue = ref(0)
-const viewMode = ref<'unanswered' | 'answered'>('unanswered') 
-const displayedQuestion = ref<any>(null) 
-
-const answeredQuestions = computed(() => {
-  return allQuestions.value.filter(q => q.already_answered === true)
-})
-
-const unansweredQuestions = computed(() => {
-  return allQuestions.value.filter(q => !q.already_answered || q.already_answered === false)
-})
-
-const filteredQuestions = computed(() => {
-  return viewMode.value === 'unanswered' ? unansweredQuestions.value : answeredQuestions.value
-})
-
-const porcentagemProgresso = computed(() => {
-  if (filteredQuestions.value.length === 0) return 0
-  return Math.round(((currentQuestionIndex.value + 1) / filteredQuestions.value.length) * 100)
-})
-
-const currentQuestion = computed(() => {
-  if (displayedQuestion.value && answered.value) {
-    return displayedQuestion.value
+function mapQuestion(q: any): ApiQuestion {
+  return {
+    id: q.id,
+    titulo: q.titulo,
+    autor: q.autor,
+    musica_url: q.musica_url,
+    ano_lancamento: q.ano_lancamento,
+    ano_prova: q.ano_prova,
+    trecho_letra: q.trecho_letra,
+    enunciado: q.enunciado,
+    a: q.a,
+    b: q.b,
+    c: q.c,
+    d: q.d,
+    e: q.e,
+    alternativa_correta: q.alternativa_correta,
+    comentario: q.comentario,
+    curiosidade: q.curiosidade,
+    creditos: q.creditos,
+    matriz_enem: q.matriz_enem,
+    prova: q.prova,
+    disciplina: q.disciplina,
+    already_answered: q.already_answered,
+    previous_result: q.previous_result,
+    previous_answer: q.previous_answer
   }
-  if (filteredQuestions.value.length === 0) return null
-  if (currentQuestionIndex.value >= filteredQuestions.value.length) {
-    currentQuestionIndex.value = 0
-  }
-  const question = filteredQuestions.value[currentQuestionIndex.value]
-  if (!answered.value && question) {
-    displayedQuestion.value = question
-  }
-  return question
-})
-
-const hasNextQuestion = computed(() => currentQuestionIndex.value < filteredQuestions.value.length - 1)
-const hasPreviousQuestion = computed(() => currentQuestionIndex.value > 0)
-const lyricsLines = computed(() => {
-  if (!currentQuestion.value?.lyrics) return []
-  return currentQuestion.value.lyrics.split('\n').filter((line: string) => line.trim())
-})
-const questionOptions = computed(() => {
-  if (!currentQuestion.value) return []
-  const q = currentQuestion.value
-  return [
-    { label: 'A', text: q.options.A, isCorrect: false },
-    { label: 'B', text: q.options.B, isCorrect: false },
-    { label: 'C', text: q.options.C, isCorrect: false },
-    { label: 'D', text: q.options.D, isCorrect: false },
-    { label: 'E', text: q.options.E, isCorrect: false },
-  ]
-})
-
-// 🚀 O ELEVADOR DE QUESTÕES
-function scrollToTop() {
-  window.scrollTo({
-    top: 0,
-    behavior: 'smooth'
-  })
 }
 
-async function loadQuestions(forceRefresh = false) {
-  loading.value = true
-  error.value = null
-  try {
-    if (forceRefresh) {
-      await new Promise(resolve => setTimeout(resolve, 1000))
-    }
-    const categoryParam = category.value
-    const categoryMap: Record<string, string> = {
-      'unicamp': 'Unicamp',
-      'fuvest': 'Fuvest',
-      'enem': 'Enem',
-      'outros': 'Outros'
-    }
-    const backendCategory = categoryMap[categoryParam] || categoryParam
-    const data = await api.questions.getAll(backendCategory)
-    
-    console.log("🕵️‍♂️ DADOS QUE CHEGARAM DO BACKEND:", data[0])
+function scrollToTop() {
+  window.scrollTo({ top: 0, behavior: 'smooth' })
+}
 
-    if (data && data.length > 0) {
-      allQuestions.value = data.sort(() => Math.random() - 0.5)
-      if (unansweredQuestions.value.length > 0) {
-        viewMode.value = 'unanswered'
-        currentQuestionIndex.value = 0
-      } else if (answeredQuestions.value.length > 0) {
-        viewMode.value = 'answered'
-        currentQuestionIndex.value = 0
-      }
-      resetQuestionState()
-    } else {
-      allQuestions.value = []
-    }
-  } catch (err: any) {
-    error.value = err.message || 'Erro ao carregar questões'
-  } finally {
-    loading.value = false
+function scrollToBottom() {
+  window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' })
+}
+
+function resetAudioState() {
+  if (youtubeIframe.value && isPlaying.value) {
+    youtubeIframe.value.contentWindow?.postMessage(
+      JSON.stringify({ event: 'command', func: 'pauseVideo', args: [] }),
+      '*'
+    )
+  }
+
+  isPlaying.value = false
+  audioProgress.value = 0
+  audioDuration.value = 0
+
+  if (progressInterval) {
+    clearInterval(progressInterval)
+    progressInterval = null
   }
 }
 
@@ -512,71 +475,123 @@ function resetQuestionState() {
   answered.value = false
   isCorrect.value = false
   correctAnswer.value = ''
-  
-  if (youtubeIframe.value && isPlaying.value) {
-    youtubeIframe.value.contentWindow?.postMessage(
-      JSON.stringify({ event: 'command', func: 'pauseVideo', args: [] }), 
-      '*'
-    )
-  }
-  
-  isPlaying.value = false
-  audioProgress.value = 0
-  if (progressInterval) clearInterval(progressInterval)
-  
+  limiteDiarioAtingido.value = false
   alreadyAnswered.value = false
   previousResult.value = null
   pointsEarned.value = false
   pointsValue.value = 0
-  displayedQuestion.value = null 
-  
-  if (currentQuestion.value && typeof currentQuestion.value === 'object' && currentQuestion.value !== null) {
-    if (currentQuestion.value.already_answered) {
-      alreadyAnswered.value = true
-      previousResult.value = (currentQuestion.value.previous_result !== undefined && currentQuestion.value.previous_result !== null) 
-        ? currentQuestion.value.previous_result 
-        : null
+  displayedQuestion.value = null
+
+  resetAudioState()
+
+  const question = allQuestions.value[currentQuestionIndex.value]
+  if (question?.already_answered) {
+    alreadyAnswered.value = true
+    previousResult.value = question.previous_result ?? null
+  }
+}
+
+function syncAuthScore(totalScore: number | null | undefined) {
+  if (typeof totalScore !== 'number' || !authStore.user) return
+  authStore.user.pontuacao = Math.max(0, Number(totalScore))
+}
+
+async function syncProfileSafely() {
+  try {
+    await authStore.fetchUserProfile()
+  } catch (err) {
+    console.error('[QUIZ] Falha ao sincronizar perfil:', err)
+  }
+}
+
+async function loadQuestions(forceRefresh = false) {
+  loading.value = true
+  error.value = null
+  sessionScore.value = 0
+  partidaId.value = null
+
+  try {
+    if (forceRefresh) {
+      await new Promise((resolve) => setTimeout(resolve, 300))
     }
+
+    const data = await api.daily.getQuestions() as DailyQuestionResponse
+
+    if (data?.status === 'vazio') {
+      allQuestions.value = []
+      error.value = data.mensagem || 'Nenhuma missão disponível no momento.'
+      return
+    }
+
+    if (data?.status === 'sucesso' && Array.isArray(data.questoes) && data.questoes.length > 0) {
+      partidaId.value = typeof data.partida_id === 'number' ? data.partida_id : null
+      allQuestions.value = data.questoes.map(mapQuestion)
+      currentQuestionIndex.value = 0
+      resetQuestionState()
+
+      if (quizStore.iniciarPartida) {
+        quizStore.iniciarPartida()
+      }
+
+      return
+    }
+
+    allQuestions.value = []
+    error.value = 'Nenhuma questão encontrada no momento.'
+  } catch (err: any) {
+    console.error('[QUIZ] Erro em loadQuestions:', err)
+    error.value = err.message || 'Erro ao carregar missão do dia.'
+  } finally {
+    loading.value = false
   }
 }
 
 function playYoutube() {
-  if (youtubeVideoId.value && youtubeIframe.value) {
-    isPlaying.value = true
-    
-    youtubeIframe.value.contentWindow?.postMessage(
-      JSON.stringify({ event: 'command', func: 'playVideo', args: [] }), 
-      '*'
-    )
-    
-    audioProgress.value = 0
-    const start = parseInt(youtubeStartTime.value) || 0
-    const end = parseInt(youtubeEndTime.value) || 0
-    
-    if (end > start) {
-      audioDuration.value = end - start
-      const intervalMs = 100 
-      const step = (100 / (audioDuration.value * 1000)) * intervalMs
-      
+  if (!youtubeVideoId.value || !youtubeIframe.value) return
+
+  isPlaying.value = true
+
+  youtubeIframe.value.contentWindow?.postMessage(
+    JSON.stringify({ event: 'command', func: 'playVideo', args: [] }),
+    '*'
+  )
+
+  audioProgress.value = 0
+  const start = parseInt(youtubeStartTime.value) || 0
+  const end = parseInt(youtubeEndTime.value) || 0
+
+  if (end > start) {
+    audioDuration.value = end - start
+    const intervalMs = 100
+    const step = (100 / (audioDuration.value * 1000)) * intervalMs
+
+    if (progressInterval) {
       clearInterval(progressInterval)
-      
-      setTimeout(() => {
-        if (isPlaying.value) {
-          progressInterval = setInterval(() => {
-            audioProgress.value += step
-            if (audioProgress.value >= 100) {
-              audioProgress.value = 100
-              isPlaying.value = false 
-              youtubeIframe.value?.contentWindow?.postMessage(
-                JSON.stringify({ event: 'command', func: 'pauseVideo', args: [] }), 
-                '*'
-              )
-              clearInterval(progressInterval)
-            }
-          }, intervalMs)
-        }
-      }, 1000) 
+      progressInterval = null
     }
+
+    setTimeout(() => {
+      if (!isPlaying.value) return
+
+      progressInterval = setInterval(() => {
+        audioProgress.value += step
+
+        if (audioProgress.value >= 100) {
+          audioProgress.value = 100
+          isPlaying.value = false
+
+          youtubeIframe.value?.contentWindow?.postMessage(
+            JSON.stringify({ event: 'command', func: 'pauseVideo', args: [] }),
+            '*'
+          )
+
+          if (progressInterval) {
+            clearInterval(progressInterval)
+            progressInterval = null
+          }
+        }
+      }, intervalMs)
+    }, 1000)
   }
 }
 
@@ -596,18 +611,23 @@ function triggerConfetti() {
     colors: ['#A32A52', '#E25822', '#D4AF37', '#2ACEA4', '#f39c12', '#f7dc6f']
   })
 
-  const interval = setInterval(function() {
+  const interval = setInterval(() => {
     const timeLeft = animationEnd - Date.now()
-    if (timeLeft <= 0) return clearInterval(interval)
+
+    if (timeLeft <= 0) {
+      clearInterval(interval)
+      return
+    }
 
     const particleCount = 50 * (timeLeft / duration)
-    
+
     confetti({
       ...defaults,
       particleCount,
       origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 },
       colors: ['#A32A52', '#E25822', '#D4AF37', '#2ACEA4']
     })
+
     confetti({
       ...defaults,
       particleCount,
@@ -618,97 +638,161 @@ function triggerConfetti() {
 }
 
 function selectOption(index: number) {
-  if (!answered.value) {
+  if (!answered.value && !isChecking.value && !limiteDiarioAtingido.value) {
     selectedOption.value = index
   }
 }
 
 async function confirmAnswer() {
-  if (selectedOption.value === null || !currentQuestion.value) return
-  const selectedLabel = questionOptions.value[selectedOption.value].label
-  
+  if (selectedOption.value === null || !currentQuestion.value || isChecking.value) return
+
+  isChecking.value = true
+  error.value = null
+
+  const selectedLabel = questionOptions.value[selectedOption.value]?.label
+  if (!selectedLabel) {
+    isChecking.value = false
+    error.value = 'Alternativa inválida.'
+    return
+  }
+
   try {
-    const result = await api.questions.checkAnswer(currentQuestion.value.id, selectedLabel)
+    const data = await api.questions.checkAnswerDetailed(currentQuestion.value.id, {
+      partida_id: partidaId.value,
+      alternativa_selecionada: selectedLabel,
+      time_spent: 15
+    }) as CheckAnswerResponse
+
+    displayedQuestion.value = currentQuestion.value ? { ...currentQuestion.value } : null
     answered.value = true
-    isCorrect.value = result.is_correct
-    correctAnswer.value = result.correct_answer
-    alreadyAnswered.value = result.already_answered || false
-    previousResult.value = result.previous_result
-    pointsEarned.value = result.points_earned || false
-    pointsValue.value = result.points || 0
-    
-    if (!displayedQuestion.value && currentQuestion.value) {
-      displayedQuestion.value = { ...currentQuestion.value }
+
+    if (data?.limit_reached) {
+      limiteDiarioAtingido.value = true
+      isCorrect.value = false
+
+      correctAnswer.value =
+        data.correct_answer ||
+        (currentQuestion.value.alternativa_correta
+          ? String(currentQuestion.value.alternativa_correta).toUpperCase()
+          : '')
+
+      alreadyAnswered.value = false
+      previousResult.value = null
+      pointsEarned.value = false
+      pointsValue.value = 0
+
+      if (typeof data.partida_id === 'number') {
+        partidaId.value = data.partida_id
+      }
+
+      await syncProfileSafely()
+
+      setTimeout(() => {
+        scrollToBottom()
+      }, 300)
+
+      return
     }
-    if (displayedQuestion.value) {
-      displayedQuestion.value.already_answered = true
-      displayedQuestion.value.previous_result = previousResult.value
+
+    isCorrect.value = !!data?.is_correct
+
+    correctAnswer.value =
+      data?.correct_answer ||
+      (currentQuestion.value.alternativa_correta
+        ? String(currentQuestion.value.alternativa_correta).toUpperCase()
+        : '')
+
+    limiteDiarioAtingido.value = !!data?.limite_diario_atingido
+
+    if (typeof data?.partida_id === 'number') {
+      partidaId.value = data.partida_id
     }
-    
-    const currentQ = displayedQuestion.value || currentQuestion.value
-    if (currentQ && typeof currentQ === 'object' && currentQ !== null) {
-      try {
-        const questionId = currentQ.id
-        if (questionId) {
-          const questionInAllList = allQuestions.value.find(q => q && q.id === questionId)
-          if (questionInAllList && typeof questionInAllList === 'object' && questionInAllList !== null) {
-            try {
-              if (!('already_answered' in questionInAllList)) {
-                questionInAllList.already_answered = false
-              }
-              if (!('previous_result' in questionInAllList)) {
-                questionInAllList.previous_result = null
-              }
-              questionInAllList.already_answered = true
-              questionInAllList.previous_result = previousResult.value
-            } catch (err) {}
-          }
-        }
-      } catch (err) {}
+
+    if (quizStore.registrarResposta) {
+      quizStore.registrarResposta(
+        isCorrect.value,
+        currentQuestion.value.matriz_enem || ''
+      )
     }
-    
+
+    alreadyAnswered.value = !!data?.already_answered
+    previousResult.value = typeof data?.previous_result === 'boolean' ? data.previous_result : null
+    pointsEarned.value = !!data?.points_earned
+    pointsValue.value = Number(data?.points ?? 0)
+
+    // ====================================================================
+    // 🛠️ MODO DEV: ALIMENTANDO AS PASTAS DO ESTÚDIO AUTOMATICAMENTE!
+    // Se não for modo revisão e for uma jogada válida, salva no Estúdio
+    // ====================================================================
+    if (!alreadyAnswered.value && !limiteDiarioAtingido.value) {
+      if (isCorrect.value) {
+        const atualBis = Number(localStorage.getItem('dev_bis_count')) || 0
+        localStorage.setItem('dev_bis_count', (atualBis + 1).toString())
+      } else {
+        const atualRiscado = Number(localStorage.getItem('dev_riscado_count')) || 0
+        localStorage.setItem('dev_riscado_count', (atualRiscado + 1).toString())
+      }
+    }
+
+    if (typeof data?.total_score === 'number') {
+      syncAuthScore(data.total_score)
+    } else if (authStore.user) {
+      authStore.user.pontuacao = Math.max(
+        0,
+        Number(authStore.user.pontuacao ?? 0) + pointsValue.value
+      )
+    }
+
+    sessionScore.value = Math.max(0, sessionScore.value + pointsValue.value)
+
+    await syncProfileSafely()
+
     if (isCorrect.value && pointsEarned.value) {
-      setTimeout(() => triggerConfetti(), 300)
+      setTimeout(() => {
+        triggerConfetti()
+      }, 300)
     }
+
+    setTimeout(() => {
+      scrollToBottom()
+    }, 300)
   } catch (err: any) {
-    error.value = err.message || 'Erro ao verificar resposta'
+    console.error('[QUIZ] Erro em confirmAnswer:', err)
+    error.value = err.message || 'Cabo desconectado! Plugue novamente!'
+  } finally {
+    isChecking.value = false
   }
 }
 
-// O Elevador age ao avançar
 function nextQuestion() {
-  if (hasNextQuestion.value) {
-    currentQuestionIndex.value++
-    resetQuestionState()
-    scrollToTop()
-  } else if (viewMode.value === 'unanswered' && answeredQuestions.value.length > 0) {
-    viewMode.value = 'answered'
-    currentQuestionIndex.value = 0
-    resetQuestionState()
-    scrollToTop()
-  }
-}
+  if (!hasNextQuestion.value) return
 
-// O Elevador age ao voltar
-function previousQuestion() {
-  if (hasPreviousQuestion.value) {
-    currentQuestionIndex.value--
-    resetQuestionState()
-    scrollToTop()
-  }
-}
-
-// O Elevador age ao alternar as abas
-function setViewMode(mode: 'unanswered' | 'answered') {
-  viewMode.value = mode
-  currentQuestionIndex.value = 0
+  currentQuestionIndex.value++
   resetQuestionState()
   scrollToTop()
 }
 
-// 👇 A MÁGICA FOI FEITA AQUI! O TELETRANSPORTE PARA O TROFÉU! 🏆
-function finishQuiz() {
-  router.push('/missao-cumprida')
+async function finishQuiz() {
+  if (isFinishing.value) return
+
+  isFinishing.value = true
+
+  try {
+    if (quizStore.finalizarPartida) {
+      quizStore.finalizarPartida(sessionScore.value)
+    }
+
+    await syncProfileSafely()
+  } catch (err) {
+    console.error('[QUIZ] Erro ao atualizar perfil do jogador:', err)
+  } finally {
+    isFinishing.value = false
+  }
+
+  router.push({
+    path: '/missao-cumprida',
+    query: { pontos: sessionScore.value }
+  })
 }
 
 function goToHome() {
@@ -716,18 +800,11 @@ function goToHome() {
 }
 
 onMounted(() => {
-  loadQuestions(true) 
+  loadQuestions(true)
 })
 
 onUnmounted(() => {
-  isPlaying.value = false 
-  if (youtubeIframe.value) {
-    youtubeIframe.value.contentWindow?.postMessage(
-      JSON.stringify({ event: 'command', func: 'pauseVideo', args: [] }), 
-      '*'
-    )
-  }
-  if (progressInterval) clearInterval(progressInterval)
+  resetAudioState()
 })
 </script>
 
@@ -915,93 +992,6 @@ onUnmounted(() => {
   100% { transform: translateX(100%); }
 }
 
-.quiz__filter-tabs {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 16px;
-  background: #FDF5F2; 
-  padding: 6px;
-  border-radius: 16px;
-  border: 1px solid rgba(226, 88, 34, 0.08);
-}
-
-.quiz__filter-tab {
-  flex: 1;
-  padding: 10px;
-  background: transparent;
-  border: none;
-  border-radius: 12px;
-  color: var(--text-muted);
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  transition: all 0.3s ease;
-}
-
-.quiz__filter-tab--active {
-  background: #fff;
-  color: var(--primary);
-  box-shadow: 0 4px 10px rgba(0,0,0,0.05);
-  font-weight: 800;
-}
-
-.quiz__filter-count {
-  background: rgba(0,0,0,0.05);
-  padding: 2px 6px;
-  border-radius: 8px;
-  font-size: 11px;
-}
-
-.quiz__filter-tab--active .quiz__filter-count {
-  background: rgba(163, 42, 82, 0.1);
-  color: var(--primary);
-}
-
-.quiz__navigation {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 16px; 
-}
-
-.quiz__nav-btn {
-  width: 40px;
-  height: 40px;
-  background: #fff;
-  border: 1px solid var(--border-light);
-  border-radius: 12px;
-  color: var(--primary);
-  font-size: 14px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.3s ease;
-  box-shadow: 0 2px 5px rgba(0,0,0,0.02);
-}
-
-.quiz__nav-btn:not(:disabled):hover {
-  background: var(--primary);
-  color: #fff;
-  transform: translateY(-2px);
-}
-
-.quiz__nav-btn:disabled {
-  opacity: 0.3;
-  cursor: not-allowed;
-  background: transparent;
-}
-
-.quiz__nav-info {
-  font-size: 14px;
-  font-weight: 800;
-  color: var(--text-muted);
-}
-
 .quiz__audio-section {
   display: flex;
   align-items: center;
@@ -1127,7 +1117,6 @@ onUnmounted(() => {
   color: #B58500; 
 }
 
-/* 📖 LETRA DA MÚSICA */
 .quiz__lyrics {
   padding: 32px 20px;
   background: #FFFAF0; 
@@ -1137,7 +1126,6 @@ onUnmounted(() => {
   border-left: 6px solid var(--secondary); 
   position: relative;
   text-align: center;
-  /* Margem reduzida para dar espaço aos créditos logo abaixo */
   margin-bottom: 8px; 
   box-shadow: 
     inset 2px 2px 5px rgba(255, 255, 255, 0.9),
@@ -1164,12 +1152,11 @@ onUnmounted(() => {
   margin: 10px 0;
 }
 
-/* 📝 CRÉDITOS DA MÚSICA (Totalmente colado à direita) */
 .quiz__credits {
   display: flex;
-  justify-content: flex-end; /* Alinha flexível à direita */
-  padding: 0; /* Removido o padding lateral para encostar no card */
-  margin-top: -6px; /* Puxa um pouco para ficar juntinho da letra */
+  justify-content: flex-end; 
+  padding: 0; 
+  margin-top: -6px; 
   margin-bottom: 24px;
   position: relative;
   z-index: 2;
@@ -1190,7 +1177,6 @@ onUnmounted(() => {
   text-align: right;
 }
 
-/* 🎯 ENUNCIADO */
 .quiz__statement {
   padding: 24px;
   background: #F9F6F5; 
@@ -1208,7 +1194,6 @@ onUnmounted(() => {
   margin: 0;
 }
 
-/* 🎯 ALTERNATIVAS */
 .quiz__options {
   display: flex;
   flex-direction: column;
@@ -1223,7 +1208,6 @@ onUnmounted(() => {
   font-weight: 600 !important;
 }
 
-/* Ações / Botões */
 .btn-premium {
   background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%) !important;
   border: none !important;
@@ -1277,11 +1261,11 @@ onUnmounted(() => {
   transform: translateY(-1px);
 }
 
-.quiz__actions, .quiz__skip-action {
+.quiz__actions,
+.quiz__skip-action {
   margin-top: 24px;
 }
 
-/* Feedback Premium */
 .quiz__feedback {
   margin-top: 28px;
   padding-top: 24px;
@@ -1343,8 +1327,8 @@ onUnmounted(() => {
   animation: spin 3s linear infinite;
 }
 
-/* Sections Extras */
-.quiz__comment-section, .quiz__curiosity-section {
+.quiz__comment-section,
+.quiz__curiosity-section {
   padding: 20px;
   border-radius: 20px;
   margin-bottom: 16px;
@@ -1353,14 +1337,16 @@ onUnmounted(() => {
   border: 1px solid var(--border-light);
 }
 
-.quiz__comment-header, .quiz__curiosity-header {
+.quiz__comment-header,
+.quiz__curiosity-header {
   display: flex;
   align-items: center;
   gap: 12px;
   margin-bottom: 12px;
 }
 
-.icon-wrapper, .icon-wrapper-gold {
+.icon-wrapper,
+.icon-wrapper-gold {
   width: 36px;
   height: 36px;
   border-radius: 12px;
@@ -1373,21 +1359,24 @@ onUnmounted(() => {
 .icon-wrapper { background: rgba(163, 42, 82, 0.1); color: var(--primary); }
 .icon-wrapper-gold { background: rgba(212, 175, 55, 0.1); color: var(--gold); }
 
-.quiz__comment-title, .quiz__curiosity-title {
+.quiz__comment-title,
+.quiz__curiosity-title {
   font-size: 16px;
   font-weight: 800;
   color: var(--text-main);
   margin: 0;
 }
 
-.quiz__comment-content, .quiz__curiosity-content {
+.quiz__comment-content,
+.quiz__curiosity-content {
   font-size: 16px; 
   line-height: 1.6;
   color: #1a1412;
 }
 
-/* Loading e Empty States Premium */
-.quiz__loading, .quiz__error, .quiz__empty, .quiz__empty-filter {
+.quiz__loading,
+.quiz__error,
+.quiz__empty {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1407,26 +1396,8 @@ onUnmounted(() => {
   margin-bottom: 24px;
 }
 
-.quiz__empty-filter-icon {
-  font-size: 64px;
-  color: var(--text-muted);
-  opacity: 0.3;
-  margin-bottom: 24px;
-}
-
-.quiz__empty-filter-icon.gold-icon {
-  color: var(--gold);
-  opacity: 1;
-  filter: drop-shadow(0 4px 10px rgba(212, 175, 55, 0.3));
-}
-
-.quiz__empty-title {
-  font-size: 22px;
-  color: var(--primary);
-  font-weight: 900;
-}
-
 @keyframes spin { 100% { transform: rotate(360deg); } }
+
 @keyframes slideIn {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
@@ -1437,22 +1408,23 @@ onUnmounted(() => {
   .quiz__container { max-width: 800px; }
   :deep(.quiz__card) { padding: 32px 40px; }
   .quiz__title { font-size: 26px; }
-  
+
   .quiz__audio-title { font-size: 24px; }
-  
+
   .quiz__lyrics { padding: 40px 32px; }
   .quiz__lyrics-text { font-size: 24px; }
   .quiz__lyrics-text p { margin: 12px 0; }
-  
-  /* Créditos no desktop também aumentam de leve */
+
   .quiz__credits-pill { font-size: 14px; padding: 8px 18px; }
 
   .quiz__statement { padding: 32px; }
-  .quiz__statement-text { font-size: 24px; } 
-  
+  .quiz__statement-text { font-size: 24px; }
+
   .quiz__options :deep(button),
-  .quiz__options :deep(.option-content) { font-size: 20px !important; }
-  
+  .quiz__options :deep(.option-content) {
+    font-size: 20px !important;
+  }
+
   .quiz__audio-section { padding: 20px 24px; }
   .quiz__play-btn { width: 70px; height: 70px; }
   .quiz__play-icon { font-size: 26px; }

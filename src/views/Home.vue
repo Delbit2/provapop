@@ -11,210 +11,179 @@
         </div>
       </div>
 
-      <!-- 2. O PROTAGONISTA: MISSÃO DO DIA (Chamativa e Gigante) -->
+      <!-- 2. O PROTAGONISTA: MISSÃO DO DIA (Absoluta na tela) -->
       <div class="home__hero-mission animate-slide-up" style="animation-delay: 0.1s;">
         <h2 class="section-title">Missão Principal</h2>
         
-        <button class="hero-card" @click="startQuiz('enem')">
+        <!-- O BOTÃO CAMALEÃO (Muda se a missão já foi concluída) -->
+        <button 
+          class="hero-card" 
+          :class="{ 'hero-card--completed': missionCompletedToday }"
+          @click="handleMissionAction"
+        >
           <div class="hero-card__glow"></div>
           <div class="hero-card__content">
+            
             <div class="hero-card__info">
-              <div class="hero-card__badge">RECOMENDADO</div>
-              <h3 class="hero-card__title">Desafio ENEM</h3>
-              <p class="hero-card__desc">Continue sua jornada. 2 questões aguardam você!</p>
-            </div>
-            <div class="hero-card__action">
-              <div class="hero-play-btn">
-                <font-awesome-icon icon="play" />
+              <div class="hero-card__badge" :class="{ 'badge-completed': missionCompletedToday }">
+                {{ missionCompletedToday ? 'CONCLUÍDA ✅' : 'RECOMENDADO' }}
               </div>
-            </div>
-          </div>
-        </button>
-
-        <!-- Missão Secundária (Menor para não roubar a cena) -->
-        <button class="secondary-card" @click="startQuiz('foco')">
-          <div class="secondary-card__icon">
-            <font-awesome-icon icon="rocket" />
-          </div>
-          <div class="secondary-card__text">
-            <span class="secondary-title">Da Terra à Lua</span>
-            <span class="secondary-subtitle">Treino Temático</span>
-          </div>
-          <font-awesome-icon icon="chevron-right" class="secondary-arrow" />
-        </button>
-      </div>
-
-      <!-- 3. PAINEL DO JOGADOR (Status, Pontos e Foguinho) -->
-      <div class="home__player-dashboard animate-slide-up" style="animation-delay: 0.2s;">
-        <h2 class="section-title">Seu Progresso</h2>
-        
-        <div class="dashboard-glass">
-          <!-- O "Cofre" Principal -->
-          <div class="dashboard-main-stats">
-            <div class="hud-badge streak" :class="{ 'active': userStreak > 0 }">
-              <span class="hud-icon fire-icon">🔥</span>
-              <div class="hud-text">
-                <span class="hud-value">{{ userStreak }}</span>
-                <span class="hud-label">Dias Seguidos</span>
-              </div>
+              <h3 class="hero-card__title">
+                {{ missionCompletedToday ? 'Ir para o Estúdio' : 'Desafio ENEM' }}
+              </h3>
+              <p class="hero-card__desc">
+                {{ missionCompletedToday ? 'Missão de hoje cumprida! Revise suas obras.' : 'Quatro questões pra hoje!' }}
+              </p>
             </div>
             
-            <div class="hud-badge points">
-              <span class="hud-icon">⚡</span>
-              <div class="hud-text">
-                <span class="hud-value">{{ userPoints }}</span>
-                <span class="hud-label">Pontos ProvaPop</span>
+            <div class="hero-card__action">
+              <div class="hero-play-btn" :class="{ 'btn-completed': missionCompletedToday }">
+                <font-awesome-icon :icon="missionCompletedToday ? 'headphones' : 'play'" />
+              </div>
+            </div>
+
+          </div>
+        </button>
+      </div>
+
+      <!-- 3. PAINEL DA TURNÊ (Substitui a Chama!) 🚌🎶 -->
+      <div class="home__tour-status animate-slide-up" style="animation-delay: 0.2s;">
+        <div class="tour-card">
+          
+          <!-- O Ônibus da Banda (Status Atual) -->
+          <div class="tour-main">
+            <div class="tour-bus-wrapper" :class="{ 'on-the-road': userStreak > 0 }">
+              <span class="bus-icon">🚌</span>
+              <span v-if="userStreak > 0" class="music-notes">🎶</span>
+            </div>
+            <div class="tour-texts">
+              <span class="tour-title">
+                {{ userStreak > 0 ? `${userStreak} ${userStreak === 1 ? 'Dia em Turnê!' : 'Dias em Turnê!'}` : 'Van estacionada...' }}
+              </span>
+              <span class="tour-subtitle">
+                {{ userStreak > 0 ? 'O show não pode parar! 🎸' : 'Cumpra a missão e pegue a estrada! 🚌' }}
+              </span>
+            </div>
+          </div>
+
+          <!-- Divisória Elegante -->
+          <div class="tour-divider-horizontal"></div>
+
+          <!-- Métricas de Sucesso (Recorde e Pontos) -->
+          <div class="tour-stats">
+            <!-- Recorde -->
+            <div class="stat-item">
+              <div class="stat-icon-wrapper record-bg">
+                <span class="stat-icon">🏆</span>
+              </div>
+              <div class="stat-info">
+                <span class="stat-value">{{ userRecord }} {{ userRecord === 1 ? 'dia' : 'dias' }}</span>
+                <span class="stat-label">Turnê Recorde</span>
+              </div>
+            </div>
+
+            <div class="stat-divider-vertical"></div>
+
+            <!-- Pontos -->
+            <div class="stat-item">
+              <div class="stat-icon-wrapper points-bg">
+                <span class="stat-icon">⭐</span>
+              </div>
+              <div class="stat-info">
+                <span class="stat-value">{{ userPoints }}</span>
+                <span class="stat-label">Pontos Totais</span>
               </div>
             </div>
           </div>
 
-          <!-- Estatísticas Menores -->
-          <div class="dashboard-sub-stats">
-            <div class="sub-stat">
-              <font-awesome-icon icon="trophy" class="sub-stat-icon" />
-              <span class="sub-stat-val">{{ stats.total_quizzes || 0 }}</span>
-              <span class="sub-stat-lbl">Quizzes</span>
-            </div>
-            <div class="sub-stat divider"></div>
-            <div class="sub-stat">
-              <font-awesome-icon icon="check-circle" class="sub-stat-icon success" />
-              <span class="sub-stat-val">{{ stats.accuracy ? `${Math.round(stats.accuracy)}%` : '0%' }}</span>
-              <span class="sub-stat-lbl">Acertos</span>
-            </div>
-            <div class="sub-stat divider"></div>
-            <div class="sub-stat">
-              <font-awesome-icon icon="chart-line" class="sub-stat-icon gold" />
-              <span class="sub-stat-val">{{ stats.ranking_position ? `#${stats.ranking_position}` : '#--' }}</span>
-              <span class="sub-stat-lbl">Ranking</span>
-            </div>
-          </div>
         </div>
       </div>
 
-      <!-- 4. BANNER INTERATIVO DO WEBBOOK -->
-      <div class="home__webbook-banner animate-slide-up" style="animation-delay: 0.3s;">
-        <div class="webbook-content">
-          <div class="webbook-icon">⭐</div>
-          <div class="webbook-text-area">
-            <h3 class="webbook-title">Webbook Premium</h3>
-            <span class="webbook-badge-soon">EM BREVE</span>
+      <!-- 4. BANNER E-BOOK HOTMART (Conversão Principal) -->
+      <div class="home__ebook-banner animate-slide-up" style="animation-delay: 0.3s;">
+        <div class="ebook-content">
+          <div class="ebook-icon">📚</div>
+          <div class="ebook-text-area">
+            <h3 class="ebook-title">E-book ProvaPop!</h3>
+            <span class="badge-available">JÁ DISPONÍVEL</span>
           </div>
         </div>
-        <button class="webbook-btn-disabled" @click="handleWebbook">
-          Aguarde!
+        <button class="ebook-btn" @click="router.push('/ebook')">
+          Garantir 🚀
+        </button>
+      </div>
+
+      <!-- 5. BANNER: APOIE O PROJETO -->
+      <div class="home__support-banner animate-slide-up" style="animation-delay: 0.4s;">
+        <div class="support-content">
+          <div class="support-icon">☕</div>
+          <div class="support-text-area">
+            <h3 class="support-title">Apoie o ProvaPop!</h3>
+            <p class="support-desc">Pague um cafezinho para os DEVs.</p>
+          </div>
+        </div>
+        <button class="support-btn" @click="handleSupport">
+          Apoiar 
+          <font-awesome-icon icon="heart" class="heart-icon" />
         </button>
       </div>
 
     </div>
-
-    <!-- BOTTOM NAVIGATION BAR -->
-    <nav class="bottom-nav">
-      <button class="nav-item active">
-        <font-awesome-icon icon="home" class="nav-icon" />
-        <span class="nav-label">Início</span>
-      </button>
-      <button class="nav-item" @click="goToCategories">
-        <font-awesome-icon icon="dumbbell" class="nav-icon" />
-        <span class="nav-label">Treino</span>
-      </button>
-      <button class="nav-item" @click="handleRanking">
-        <font-awesome-icon icon="trophy" class="nav-icon" />
-        <span class="nav-label">Ranking</span>
-      </button>
-      <button class="nav-item" @click="goToProfile">
-        <font-awesome-icon icon="user" class="nav-icon" />
-        <span class="nav-label">Perfil</span>
-      </button>
-    </nav>
-
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { api } from '@/services/api'
-
-const userPoints = ref(1250) 
-const userStreak = ref(3)    
 
 const router = useRouter()
 const authStore = useAuthStore()
 
-const stats = ref({
-  total_quizzes: 0,
-  accuracy: 0,
-  ranking_position: null as number | null
-})
+// ESTADO DA MISSÃO DO DIA
+const missionCompletedToday = ref(false)
 
-const loading = ref(false)
+// LIGADO DIRETAMENTE AO BANCO DE DADOS (STORE) DO USUÁRIO
+const userPoints = computed(() => authStore.user?.pontuacao || 0) 
+const userStreak = computed(() => authStore.user?.ofensiva || 0)    
+const userRecord = computed(() => authStore.user?.recorde_ofensiva || authStore.user?.ofensiva || 0)
 
 const dynamicGreeting = computed(() => {
   const hour = new Date().getHours()
   let greeting = 'Boa noite'
-  
-  if (hour >= 5 && hour < 12) {
-    greeting = 'Bom dia'
-  } else if (hour >= 12 && hour < 18) {
-    greeting = 'Boa tarde'
-  }
-
+  if (hour >= 5 && hour < 12) greeting = 'Bom dia'
+  else if (hour >= 12 && hour < 18) greeting = 'Boa tarde'
   const userName = authStore.user?.nickname ? authStore.user.nickname.split(' ')[0] : 'Estudante'
-  
   return `${greeting}, ${userName}! ✨`
 })
 
-async function loadStats() {
-  if (!authStore.isAuthenticated) return
+// CHECAGEM DE STATUS DA MISSÃO AO CARREGAR A PÁGINA
+async function checkMissionStatus() {
+  // Lógica futura para checar com a API se a missão de hoje já foi feita
+  // missionCompletedToday.value = await api.checkMission()
+}
 
-  loading.value = true
-  try {
-    const userStats = await api.users.getStats()
-    stats.value.total_quizzes = userStats.total_quizzes || 0
-    stats.value.accuracy = userStats.accuracy || 0
-
-    try {
-      const ranking = await api.ranking.get('all')
-      const currentUser = ranking.find(u => u.user_id === authStore.user?.id)
-      if (currentUser) {
-        stats.value.ranking_position = currentUser.position
-      }
-    } catch (err) {
-      console.warn('Erro ao buscar ranking:', err)
-    }
-  } catch (error) {
-    console.error('Erro ao carregar estatísticas:', error)
-  } finally {
-    loading.value = false
+// O CLICK DO BOTÃO PRINCIPAL
+function handleMissionAction() {
+  if (missionCompletedToday.value) {
+    // Se já respondeu, manda direto pro Estúdio!
+    router.push('/jornada') 
+  } else {
+    // Manda para o Palco (Quiz)
+    router.push({
+      name: 'quiz',
+      params: { prova: 'enem' }
+    })
   }
 }
 
-function startQuiz(categoryId: string) {
-  router.push({
-    name: 'quiz',
-    params: { category: categoryId }
-  })
+function handleSupport() {
+  alert('Que demais! 🧡 Em breve lançaremos nossa campanha de financiamento coletivo. Guarde esse café para nós! ☕')
 }
 
-function goToCategories() {
-  router.push('/categorias')
-}
-
-function handleRanking() {
-  router.push('/ranking')
-}
-
-function handleWebbook() {
-  alert('O Webbook Premium está no forno! 🚀 Em breve você terá acesso a um material incrível!')
-}
-
-function goToProfile() {
-  router.push('/perfil')
-}
-
+// DISPARA QUANDO A PÁGINA HOME É ABERTA
 onMounted(() => {
-  loadStats()
+  checkMissionStatus()
 })
 </script>
 
@@ -228,7 +197,8 @@ onMounted(() => {
   --border-light: rgba(139, 30, 63, 0.1);
 
   min-height: 100vh;
-  padding: 16px 16px 90px 16px; 
+  padding: 16px 16px 120px 16px; 
+  
   background-color: #FFF4EF;
   background-image: linear-gradient(180deg, #FFF4EF 0%, #FFFFFF 35%, #FCF2EE 80%, #EBD2CB 100%);
   position: relative;
@@ -242,7 +212,6 @@ onMounted(() => {
   z-index: 10;
 }
 
-/* Títulos das Seções */
 .section-title {
   font-size: 15px;
   font-weight: 800;
@@ -291,7 +260,7 @@ onMounted(() => {
 }
 
 .home__logo {
-  height: 180px !important; /* Ajuste sutil para dar espaço à missão gigante */
+  height: 180px !important;
   width: auto !important;
   object-fit: contain;
   display: block;
@@ -322,7 +291,7 @@ onMounted(() => {
 
 /* --- O PROTAGONISTA: MISSÃO DO DIA --- */
 .home__hero-mission {
-  margin-bottom: 32px;
+  margin-bottom: 24px;
 }
 
 .hero-card {
@@ -337,7 +306,11 @@ onMounted(() => {
   box-shadow: 0 15px 30px rgba(139, 30, 63, 0.3);
   transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   text-align: left;
-  margin-bottom: 12px;
+}
+
+.hero-card--completed {
+  background: linear-gradient(135deg, #179B78 0%, #0c5c46 100%);
+  box-shadow: 0 15px 30px rgba(23, 155, 120, 0.25);
 }
 
 .hero-card:active {
@@ -386,6 +359,11 @@ onMounted(() => {
   backdrop-filter: blur(5px);
 }
 
+.badge-completed {
+  background: rgba(255, 255, 255, 0.25);
+  color: #fff;
+}
+
 .hero-card__title {
   color: #fff;
   font-size: 26px;
@@ -419,320 +397,150 @@ onMounted(() => {
   animation: pulse-play 2s infinite;
 }
 
+.btn-completed {
+  color: #179B78;
+}
+
 @keyframes pulse-play {
   0% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.4); }
   70% { box-shadow: 0 0 0 15px rgba(255, 255, 255, 0); }
   100% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0); }
 }
 
-/* Missão Secundária */
-.secondary-card {
-  width: 100%;
-  background: rgba(255, 255, 255, 0.9);
-  border: 1px solid rgba(226, 88, 34, 0.2);
-  border-radius: 16px;
-  padding: 16px;
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  cursor: pointer;
-  backdrop-filter: blur(10px);
-  box-shadow: 0 4px 15px rgba(226, 88, 34, 0.05);
-  transition: all 0.2s ease;
+/* --- PAINEL DA TURNÊ 🚌🎶 --- */
+.home__tour-status { margin-bottom: 32px; }
+
+.tour-card {
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid rgba(226, 88, 34, 0.15);
+  border-radius: 20px; padding: 20px; display: flex; flex-direction: column;
+  backdrop-filter: blur(15px); box-shadow: 0 10px 30px rgba(139, 30, 63, 0.05);
 }
 
-.secondary-card:active { transform: scale(0.98); }
+.tour-main { display: flex; align-items: center; justify-content: center; gap: 16px; }
 
-.secondary-card__icon {
-  width: 40px;
-  height: 40px;
-  background: rgba(226, 88, 34, 0.1);
-  color: var(--secondary);
-  border-radius: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 18px;
+.tour-bus-wrapper {
+  position: relative; width: 56px; height: 56px; background: #f5f5f5;
+  border-radius: 16px; display: flex; align-items: center; justify-content: center;
+  border: 2px solid #e0e0e0; transition: all 0.3s ease;
 }
 
-.secondary-card__text {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
+.bus-icon { font-size: 28px; filter: grayscale(1) opacity(0.5); transition: all 0.3s ease; }
+
+.music-notes {
+  position: absolute; top: -8px; right: -8px; font-size: 16px;
+  animation: float-notes 2s infinite ease-in-out;
 }
 
-.secondary-title {
-  color: var(--text-main);
-  font-weight: 800;
-  font-size: 16px;
+.tour-bus-wrapper.on-the-road {
+  background: #FFF0E6; border-color: var(--secondary);
+  box-shadow: 0 0 15px rgba(226, 88, 34, 0.2);
 }
 
-.secondary-subtitle {
-  color: var(--text-muted);
-  font-size: 12px;
-  font-weight: 600;
+.tour-bus-wrapper.on-the-road .bus-icon {
+  filter: grayscale(0) opacity(1);
+  animation: drive-bus 1s infinite alternate;
 }
 
-.secondary-arrow {
-  color: var(--border-light);
-  font-size: 16px;
+@keyframes drive-bus {
+  0% { transform: translateY(0px) rotate(-1deg); }
+  100% { transform: translateY(-3px) rotate(1deg); }
 }
 
-/* --- PAINEL DO JOGADOR --- */
-.home__player-dashboard {
-  margin-bottom: 32px;
+@keyframes float-notes {
+  0%, 100% { transform: translateY(0) rotate(0); opacity: 0.8; }
+  50% { transform: translateY(-5px) rotate(10deg); opacity: 1; }
 }
 
-.dashboard-glass {
-  background: rgba(255, 255, 255, 0.85);
-  border: 1px solid rgba(255, 255, 255, 1);
-  border-radius: 24px;
-  padding: 20px;
-  backdrop-filter: blur(15px);
-  box-shadow: 0 10px 30px rgba(139, 30, 63, 0.05);
+.tour-texts { display: flex; flex-direction: column; }
+.tour-title { font-size: 18px; font-weight: 900; color: var(--text-main); margin-bottom: 2px; transition: color 0.3s ease; }
+.tour-bus-wrapper.on-the-road + .tour-texts .tour-title { color: var(--secondary); }
+.tour-subtitle { font-size: 13px; font-weight: 600; color: var(--text-muted); }
+
+.tour-divider-horizontal { height: 1px; background: var(--border-light); margin: 16px 0; width: 100%; }
+.stat-divider-vertical { width: 1px; background: var(--border-light); height: 40px; }
+
+.tour-stats { display: flex; align-items: center; justify-content: space-around; }
+.stat-item { display: flex; align-items: center; gap: 12px; flex: 1; justify-content: center; }
+.stat-icon-wrapper { width: 36px; height: 36px; border-radius: 12px; display: flex; align-items: center; justify-content: center; }
+.record-bg { background: rgba(139, 30, 63, 0.1); }
+.points-bg { background: rgba(212, 175, 55, 0.15); }
+.stat-icon { font-size: 18px; }
+
+.stat-info { display: flex; flex-direction: column; }
+.stat-value { font-size: 16px; font-weight: 900; color: var(--text-main); line-height: 1.1; margin-bottom: 2px; }
+.stat-label { font-size: 10px; font-weight: 800; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.5px; }
+
+/* --- BANNER E-BOOK --- */
+.home__ebook-banner {
+  background: rgba(255, 255, 255, 0.9); border: 1px solid var(--border-light); border-radius: 20px;
+  padding: 16px 20px; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; backdrop-filter: blur(10px);
+}
+.ebook-content { display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0; }
+.ebook-icon { font-size: 28px; filter: grayscale(0.2); flex-shrink: 0; }
+.ebook-text-area { flex: 1; min-width: 0; }
+.ebook-title { color: var(--text-main); font-size: 15px; font-weight: 800; margin: 0 0 4px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.badge-available { 
+  background: #179B78; 
+  color: white; 
+  font-size: 9px; 
+  font-weight: 800; 
+  padding: 3px 6px; 
+  border-radius: 6px; 
+  letter-spacing: 0.5px; 
+  display: inline-block; 
 }
 
-.dashboard-main-stats {
-  display: flex;
-  gap: 12px;
-  margin-bottom: 20px;
-}
-
-.hud-badge {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 16px;
-  border-radius: 16px;
-  background: #fff;
-  box-shadow: 0 4px 15px rgba(0,0,0,0.03);
-}
-
-.hud-icon {
-  font-size: 28px;
-}
-
-.hud-text {
-  display: flex;
-  flex-direction: column;
-}
-
-.hud-value {
-  font-size: 20px;
-  font-weight: 900;
-  color: var(--text-main);
-  line-height: 1;
-  margin-bottom: 4px;
-}
-
-.hud-label {
-  font-size: 10px;
-  font-weight: 800;
-  text-transform: uppercase;
-  color: var(--text-muted);
-  letter-spacing: 0.5px;
-}
-
-.hud-badge.points {
-  border: 1px solid rgba(212, 175, 55, 0.2);
-}
-.hud-badge.points .hud-value { color: #D4AF37; }
-
-.hud-badge.streak {
-  border: 1px solid var(--border-light);
-}
-
-.hud-badge.streak.active {
-  border: 1px solid rgba(226, 88, 34, 0.3);
-  background: #FFF4EF;
-}
-
-.hud-badge.streak.active .hud-value {
-  color: var(--secondary);
-}
-
-.hud-badge.streak.active .fire-icon {
-  animation: pulse-fire 1.5s infinite alternate;
-}
-
-@keyframes pulse-fire {
-  0% { transform: scale(1); filter: drop-shadow(0 0 2px rgba(226,88,34,0.5)); }
-  100% { transform: scale(1.2); filter: drop-shadow(0 0 6px rgba(226,88,34,0.8)); }
-}
-
-.dashboard-sub-stats {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  background: rgba(0,0,0,0.02);
-  padding: 12px 16px;
-  border-radius: 16px;
-}
-
-.sub-stat {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  flex: 1;
-}
-
-.sub-stat.divider {
-  flex: 0;
-  width: 1px;
-  height: 30px;
-  background: var(--border-light);
-}
-
-.sub-stat-icon {
-  font-size: 16px;
-  color: var(--primary);
-}
-.sub-stat-icon.success { color: #2e7d32; }
-.sub-stat-icon.gold { color: #D4AF37; }
-
-.sub-stat-val {
-  font-size: 16px;
-  font-weight: 800;
-  color: var(--text-main);
-}
-
-.sub-stat-lbl {
-  font-size: 10px;
-  font-weight: 700;
-  color: var(--text-muted);
-  text-transform: uppercase;
-}
-
-/* --- BANNER WEBBOOK --- */
-.home__webbook-banner {
-  background: rgba(255, 255, 255, 0.9);
-  border: 1px solid var(--border-light);
-  border-radius: 20px;
-  padding: 16px 20px;
-  margin-bottom: 24px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  backdrop-filter: blur(10px);
-}
-
-.webbook-content {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.webbook-icon {
-  font-size: 28px;
-  filter: grayscale(0.8);
-  opacity: 0.7;
-}
-
-.webbook-title {
-  color: var(--text-main);
-  font-size: 15px;
-  font-weight: 800;
-  margin: 0 0 4px 0;
-}
-
-.webbook-badge-soon {
-  background: var(--text-muted);
-  color: white;
-  font-size: 9px;
-  font-weight: 800;
-  padding: 3px 6px;
-  border-radius: 6px;
-  letter-spacing: 0.5px;
-}
-
-.webbook-btn-disabled {
-  background: var(--border-light);
-  color: var(--text-muted);
-  border: none;
-  padding: 10px 16px;
-  border-radius: 12px;
-  font-weight: 800;
-  font-size: 12px;
-  cursor: pointer;
+.ebook-btn {
+  background: rgba(23, 155, 120, 0.15); 
+  color: #0c5c46; 
+  border: none; 
+  width: 40%; 
+  min-width: 100px;
+  padding: 12px 10px; 
+  border-radius: 10px; 
+  font-weight: 800; 
+  font-size: 12px; 
+  cursor: pointer; 
   flex-shrink: 0;
+  display: flex; 
+  align-items: center; 
+  justify-content: center; 
   transition: all 0.2s ease;
 }
 
-/* --- BOTTOM NAVIGATION BAR --- */
-.bottom-nav {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  width: 100%;
-  height: 75px;
-  background: rgba(255, 255, 255, 0.92);
-  backdrop-filter: blur(15px);
-  -webkit-backdrop-filter: blur(15px);
-  border-top: 1px solid rgba(255, 255, 255, 0.5);
-  box-shadow: 0 -10px 25px rgba(139, 30, 63, 0.05);
-  display: flex;
-  justify-content: space-around;
-  align-items: center;
-  padding: 0 10px 10px 10px; 
-  z-index: 100;
-}
+.ebook-btn:hover { background: rgba(23, 155, 120, 0.25); }
+.ebook-btn:active { transform: scale(0.95); }
 
-.nav-item {
-  background: none;
-  border: none;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  color: var(--text-muted);
-  cursor: pointer;
-  flex: 1;
-  height: 100%;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  opacity: 0.7;
+/* --- BANNER APOIO --- */
+.home__support-banner {
+  background: linear-gradient(135deg, #fff0eb 0%, #ffe4d6 100%); border: 1px solid rgba(226, 88, 34, 0.2);
+  border-radius: 20px; padding: 16px 20px; margin-bottom: 24px; display: flex; align-items: center;
+  justify-content: space-between; gap: 12px; box-shadow: 0 4px 15px rgba(226, 88, 34, 0.08);
 }
+.support-content { display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0; }
+.support-icon { font-size: 32px; flex-shrink: 0; animation: float-coffee 3s ease-in-out infinite; }
+@keyframes float-coffee { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+.support-text-area { flex: 1; min-width: 0; }
+.support-title { color: var(--secondary); font-size: 15px; font-weight: 900; margin: 0 0 2px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.support-desc { color: var(--text-muted); font-size: 11px; font-weight: 600; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-.nav-icon {
-  font-size: 22px;
-  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+.support-btn {
+  background: var(--secondary); color: #fff; border: none; width: 40%; min-width: 100px;
+  padding: 12px 10px; border-radius: 10px; font-weight: 800; font-size: 12px; cursor: pointer; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center; gap: 6px; box-shadow: 0 4px 10px rgba(226, 88, 34, 0.3); transition: all 0.2s ease;
 }
-
-.nav-label {
-  font-size: 11px;
-  font-weight: 700;
-}
-
-.nav-item.active {
-  color: var(--primary);
-  opacity: 1;
-}
-
-.nav-item.active .nav-icon {
-  transform: translateY(-4px);
-  filter: drop-shadow(0 4px 6px rgba(139, 30, 63, 0.2));
-}
+.support-btn:active { transform: scale(0.95); }
+.heart-icon { font-size: 12px; }
+.support-btn:hover .heart-icon { animation: beat 1s infinite; }
+@keyframes beat { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.2); } }
 
 /* Responsividade Básica */
 @media (min-width: 768px) {
-  .home { padding: 32px 32px 100px 32px; }
-  .home__container { max-width: 600px; } /* Mantém formato celular no desktop */
+  .home { padding: 32px 32px 140px 32px; }
+  .home__container { max-width: 600px; }
   .hero-card__title { font-size: 32px; }
-  .hud-value { font-size: 24px; }
-  
-  .bottom-nav {
-    max-width: 600px;
-    height: 70px;
-    left: 50%;
-    transform: translateX(-50%);
-    bottom: 24px;
-    border-radius: 35px;
-    border: 1px solid rgba(255, 255, 255, 0.8);
-    box-shadow: 0 15px 35px rgba(139, 30, 63, 0.1);
-    padding: 0 20px;
-  }
 }
 </style>

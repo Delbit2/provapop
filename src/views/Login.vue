@@ -2,8 +2,6 @@
   <div class="login">
     <Transition name="fade" appear>
       <div class="login__container">
-        
-        <!-- Cabeçalho com Logo Flutuante (Fundo Branco Absoluto) -->
         <div class="login__header">
           <div class="login__logo-wrapper">
             <img src="@/assets/logo_login.png" alt="ProvaPop! Logo" class="login__logo" />
@@ -23,10 +21,11 @@
                 Seu E-mail
               </label>
               <input
-                v-model="form.email"
+                v-model.trim="form.email"
                 type="email"
                 class="login__input"
                 placeholder="ex: futuro.calouro@email.com"
+                autocomplete="email"
                 required
               />
             </div>
@@ -42,6 +41,7 @@
                   :type="showPassword ? 'text' : 'password'"
                   class="login__input"
                   placeholder="••••••••"
+                  autocomplete="current-password"
                   required
                 />
                 <button
@@ -62,26 +62,28 @@
               <a href="#" @click.prevent="goToForgot" class="login__forgot">Esqueceu a senha?</a>
             </div>
 
-            <div v-if="authStore.error" class="login__error">
+            <div v-if="errorMessage" class="login__error">
               <font-awesome-icon icon="exclamation-circle" />
-              {{ authStore.error }}
+              {{ errorMessage }}
             </div>
 
-            <!-- Botão Play! Master -->
             <div class="login__action">
               <button
                 type="submit"
-                :disabled="authStore.loading"
+                :disabled="loading"
                 class="login__submit-btn"
               >
-                <font-awesome-icon v-if="authStore.loading" icon="circle-notch" class="login__spinner" />
-                {{ authStore.loading ? 'Afinando...' : 'Play!' }}
+                <font-awesome-icon v-if="loading" icon="circle-notch" class="login__spinner" />
+                {{ loading ? 'Afinando...' : 'Play!' }}
               </button>
             </div>
           </form>
 
           <div class="login__footer">
-            <p>Primeira vez no palco? <a href="#" @click.prevent="goToRegister" class="login__link">Crie sua conta VIP</a></p>
+            <p>
+              Primeira vez no palco?
+              <a href="#" @click.prevent="goToRegister" class="login__link">Crie sua conta VIP</a>
+            </p>
           </div>
         </Card>
       </div>
@@ -90,45 +92,80 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
-import { useRouter } from 'vue-router'
-import Card from '@/components/Card.vue'
+import { ref, onMounted } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import Card from '@/components/Card.vue'
 
 const router = useRouter()
+const route = useRoute()
 const authStore = useAuthStore()
 
 const form = ref({
   email: '',
   password: '',
-  remember: false
+  remember: false,
 })
 
 const showPassword = ref(false)
+const loading = ref(false)
+const errorMessage = ref('')
+
+onMounted(async () => {
+  if (!authStore.authInitialized) {
+    await authStore.initAuth()
+  }
+
+  if (authStore.isAuthenticated) {
+    const redirectTo =
+      typeof route.query.redirect === 'string' && route.query.redirect.startsWith('/')
+        ? route.query.redirect
+        : '/'
+
+    router.replace(redirectTo)
+  }
+})
 
 async function handleLogin() {
   try {
-    await authStore.login(form.value.email, form.value.password)
-  } catch (error) {
-    console.error('Login error:', error)
-  }
-}
+    loading.value = true
+    errorMessage.value = ''
 
-function goToRegister() {
-  router.push('/register')
+    const email = form.value.email.trim().toLowerCase()
+    const password = form.value.password
+
+    if (!email || !password) {
+      errorMessage.value = 'Preencha e-mail e senha.'
+      return
+    }
+
+    await authStore.login(email, password)
+
+    const redirectTo =
+      typeof route.query.redirect === 'string' && route.query.redirect.startsWith('/')
+        ? route.query.redirect
+        : '/'
+
+    router.push(redirectTo)
+  } catch (error: any) {
+    console.error('Login error:', error)
+    errorMessage.value =
+      authStore.error || 'Erro inesperado de conexão. Verifique sua internet.'
+  } finally {
+    loading.value = false
+  }
 }
 
 function goToForgot() {
   router.push('/esqueci-senha')
 }
+
+function goToRegister() {
+  router.push('/register')
+}
 </script>
 
 <style scoped>
-/* 
-  O SEGREDO DO FUNDO:
-  Começa em branco absoluto (#FFFFFF) de cima até o meio da tela,
-  depois desce suavemente para um tom terroso clarinho.
-*/
 .login {
   min-height: 100vh;
   display: flex;
@@ -156,7 +193,6 @@ function goToForgot() {
   margin-bottom: 12px;
 }
 
-/* Animação de flutuação da logo no mar branco */
 .login__logo {
   max-width: 240px;
   height: auto;
@@ -169,7 +205,6 @@ function goToForgot() {
   100% { transform: translateY(0px); }
 }
 
-/* Textos em tom Vinho (#8B1E3F) */
 .login__subtitle {
   font-size: 18px;
   font-weight: 600;
@@ -217,13 +252,12 @@ function goToForgot() {
   gap: 8px;
   font-size: 14px;
   font-weight: 600;
-  color: #5a4a46; /* Cinza quente */
+  color: #5a4a46;
 }
 
-/* Ícones em Laranja Terroso */
 .login__label-icon {
   font-size: 15px;
-  color: #E25822; 
+  color: #E25822;
 }
 
 .login__input {
@@ -239,7 +273,6 @@ function goToForgot() {
   outline: none;
 }
 
-/* Foco do input em Vinho */
 .login__input:focus {
   border-color: #8B1E3F;
   box-shadow: 0 0 0 4px rgba(139, 30, 63, 0.1);
@@ -306,7 +339,6 @@ function goToForgot() {
   border-radius: 4px;
 }
 
-/* Links em Laranja Terroso, com hover em Vinho */
 .login__forgot {
   color: #E25822;
   text-decoration: none;
@@ -338,7 +370,6 @@ function goToForgot() {
   margin-top: 8px;
 }
 
-/* O BOTÃO PLAY - Totalmente personalizado e BOLD */
 .login__submit-btn {
   width: 100%;
   padding: 16px;
@@ -404,7 +435,6 @@ function goToForgot() {
   text-decoration: underline;
 }
 
-/* Transições da página */
 .fade-enter-active,
 .fade-leave-active {
   transition: opacity 0.6s cubic-bezier(0.4, 0, 0.2, 1), transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
@@ -424,9 +454,9 @@ function goToForgot() {
   .login__card {
     padding: 48px 40px;
   }
-  
+
   .login__logo {
-    max-width: 280px; /* Logo um pouco maior no desktop */
+    max-width: 280px;
   }
 }
 </style>

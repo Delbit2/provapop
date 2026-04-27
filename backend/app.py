@@ -1,34 +1,39 @@
-from flask import Flask, request, jsonify, make_response, Response, stream_with_context
+import os
+from dotenv import load_dotenv
+load_dotenv()
+
+from flask import Flask, request, jsonify
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
-from datetime import datetime, timedelta
-import os
-import threading
-import time
-import requests
+from datetime import datetime, timedelta, timezone
+import secrets
+import smtplib
+import random
+import traceback
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from werkzeug.security import generate_password_hash, check_password_hash
 from config import Config
 
 app = Flask(__name__)
 app.config.from_object(Config)
 
-# --- CONFIGURAÇÃO DE CORS BLINDADA PARA O PROVAPOP ---
-# Lista de origens garantidas (hardcoded)
 GUARANTEED_ORIGINS = [
     "https://play.provapop.com.br",
     "http://play.provapop.com.br",
     "http://localhost:5173",
     "http://localhost:5174",
     "http://localhost:4173",
-    "http://localhost:3000"
+    "http://localhost:3000",
+    "http://127.0.0.1:5173",
+    "http://127.0.0.1:5000"
 ]
 
-# Pega origens das variáveis de ambiente (se existirem)
 env_origins = os.environ.get('CORS_ORIGINS', '')
 if env_origins:
     GUARANTEED_ORIGINS.extend([origin.strip() for origin in env_origins.split(',') if origin.strip()])
 
-# Remove duplicatas
 final_origins = list(set(GUARANTEED_ORIGINS))
 
 CORS(
@@ -40,1158 +45,931 @@ CORS(
     expose_headers=['Content-Type', 'Authorization'],
     max_age=3600
 )
-# --------------------------------------------------------
 
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
+
 
 def _import_auth():
     from auth import login_required, optional_auth, get_current_user as _get_current_user
     return login_required, optional_auth, _get_current_user
 
+
 login_required, optional_auth, _get_current_user = _import_auth()
 
-class User(db.Model):
-    __tablename__ = 'users'
-    
-    id = db.Column(db.Integer, primary_key=True)
-    nickname = db.Column(db.String(50), nullable=False, unique=True)
-    email = db.Column(db.String(100), nullable=False, unique=True)
-    password_hash = db.Column(db.String(255), nullable=False)
-    total_score = db.Column(db.Integer, default=0, nullable=False)  # Pontuação total do usuário
-    created_at = db.Column(db.DateTime, default=datetime.now)
-    
-    # NOVAS COLUNAS: Radar de Engajamento e Ofensivas
-    last_login = db.Column(db.DateTime, nullable=True)
-    total_play_time = db.Column(db.Integer, default=0)  # Tempo em segundos
-    current_streak = db.Column(db.Integer, default=0)   # Dias seguidos jogando
-    last_play_date = db.Column(db.Date, nullable=True)  # Data da última jogada para calcular a ofensiva
-    # NOVAS COLUNAS: Recuperacao de Senha
-    reset_token = db.Column(db.String(100), nullable=True, unique=True)
-    reset_token_expiry = db.Column(db.DateTime, nullable=True)
-    
-    quizzes = db.relationship('QuizAttempt', backref='user', lazy=True)
-    
-    def update_score(self, points):
-        """
-        Atualiza a pontuação do usuário garantindo que nunca fique negativa.
-        Sempre use este método para atualizar a pontuação.
-        """
-        self.total_score = (self.total_score or 0) + points
-        if self.total_score < 0:
-            self.total_score = 0
-        return self.total_score
-    
-    def ensure_non_negative_score(self):
-        """
-        Garante que a pontuação não seja negativa.
-        Útil para verificação após operações que podem ter modificado total_score diretamente.
-        """
-        if self.total_score < 0:
-            self.total_score = 0
-        return self.total_score
-    
+
+def debug_auth_context(tag="DEBUG"):
+    auth_header = request.headers.get("Authorization")
+    origin = request.headers.get("Origin")
+    current_user = getattr(request, "current_user", None)
+
+    print(f"=== {tag} ===")
+    print("Method:", request.method)
+    print("Path:", request.path)
+    print("Origin:", origin)
+    print("Authorization header present?:", bool(auth_header))
+    if auth_header:
+        print("Authorization header preview:", auth_header[:80] + ("..." if len(auth_header) > 80 else ""))
+    else:
+        print("Authorization header preview: None")
+    print("request.current_user:", current_user)
+    print("====================")
+
+
+class Gamer(db.Model):
+    __tablename__ = 'gamers'
+
+    id = db.Column(db.BigInteger, primary_key=True)
+    supabase_user_id = db.Column(db.String(36), unique=True, nullable=True, index=True)
+    nome = db.Column(db.String(100), nullable=False)
+    email = db.Column(db.String(120), unique=True, nullable=False)
+    password_hash = db.Column(db.String(256), nullable=False)
+
+    criado_em = db.Column(db.DateTime(timezone=True), default=datetime.utcnow)
+    ultimo_login = db.Column(db.DateTime(timezone=True), nullable=True)
+    ultimo_logout = db.Column(db.DateTime(timezone=True), nullable=True)
+
+    reset_token = db.Column(db.String(100), unique=True, nullable=True)
+    reset_token_expiry = db.Column(db.DateTime(timezone=True), nullable=True)
+
+    estatisticas = db.relationship(
+        'EstatisticaGamer',
+        backref='gamer',
+        uselist=False,
+        lazy=True,
+        cascade='all, delete-orphan'
+    )
+
+    partidas = db.relationship(
+        'Partida',
+        backref='gamer',
+        lazy=True,
+        cascade='all, delete-orphan'
+    )
+
+    respostas = db.relationship(
+        'Resposta',
+        backref='gamer',
+        lazy=True,
+        cascade='all, delete-orphan'
+    )
+
+    def get_estatisticas(self):
+        return self.estatisticas
+
     def to_dict(self, include_email=False):
-        # Garantir que a pontuação não seja negativa antes de retornar
-        self.ensure_non_negative_score()
-        
+        stats = self.get_estatisticas()
+
+        ofensiva_exibicao = stats.ofensiva_atual if stats else 0
+        data_ultima_partida = stats.data_ultima_missao_concluida if stats else None
+
+        if data_ultima_partida:
+            fuso_br = timezone(timedelta(hours=-3))
+            hoje = datetime.now(fuso_br).date()
+            if (hoje - data_ultima_partida).days > 1:
+                ofensiva_exibicao = 0
+
         data = {
             'id': self.id,
-            'nickname': self.nickname,
-            'total_score': self.total_score,  # Garantir que sempre seja >= 0
-            'created_at': self.created_at.isoformat(),
-            'last_login': self.last_login.isoformat() if self.last_login else None,
-            'total_play_time': self.total_play_time,
-            'current_streak': self.current_streak
+            'nome': self.nome,
+            'pontuacao': stats.pontuacao_total if stats else 0,
+            'total_respondidas': stats.total_respondidas if stats else 0,
+            'total_acertos': stats.total_acertos if stats else 0,
+            'ofensiva': ofensiva_exibicao,
+            'recorde_ofensiva': stats.recorde_ofensiva if stats else 0,
+            'criado_em': self.criado_em.isoformat() if self.criado_em else None,
+            'ultimo_login': self.ultimo_login.isoformat() if self.ultimo_login else None,
+            'data_ultima_partida': data_ultima_partida.isoformat() if data_ultima_partida else None
         }
+
         if include_email:
             data['email'] = self.email
+
         return data
-    
+
     def check_password(self, password):
-        from werkzeug.security import check_password_hash
         return check_password_hash(self.password_hash, password)
 
-class Question(db.Model):
-    __tablename__ = 'questions'
-    
-    id = db.Column(db.Integer, primary_key=True)
-    external_id = db.Column(db.String(50), nullable=True, unique=True)
-    song_title = db.Column(db.String(200), nullable=False)
-    artist = db.Column(db.String(200), nullable=False)
-    lyrics = db.Column(db.Text, nullable=False)
-    statement = db.Column(db.Text, nullable=False)
-    correct_answer = db.Column(db.String(1), nullable=False)
-    option_a = db.Column(db.Text, nullable=False)
-    option_b = db.Column(db.Text, nullable=False)
-    option_c = db.Column(db.Text, nullable=False)
-    option_d = db.Column(db.Text, nullable=False)
-    option_e = db.Column(db.Text, nullable=False)
-    music_drive_url = db.Column(db.String(500), nullable=True)
-    composition_year = db.Column(db.Integer, nullable=True)
-    enem_year = db.Column(db.Integer, nullable=True)
-    comment = db.Column(db.Text, nullable=True)
-    curiosity = db.Column(db.Text, nullable=True)
-    category = db.Column(db.String(20), nullable=True)
-    credits = db.Column(db.Text, nullable=True)  # <--- NOVA COLUNA AQUI
-    created_at = db.Column(db.DateTime, default=datetime.now)
-    
+
+class EstatisticaGamer(db.Model):
+    __tablename__ = 'estatisticas_gamer'
+
+    gamer_id = db.Column(db.BigInteger, db.ForeignKey('gamers.id'), primary_key=True)
+    pontuacao_total = db.Column(db.Integer, nullable=False, default=0)
+    total_respondidas = db.Column(db.Integer, nullable=False, default=0)
+    total_acertos = db.Column(db.Integer, nullable=False, default=0)
+    ofensiva_atual = db.Column(db.Integer, nullable=False, default=0)
+    recorde_ofensiva = db.Column(db.Integer, nullable=False, default=0)
+    data_ultima_missao_concluida = db.Column(db.Date, nullable=True)
+    criado_em = db.Column(db.DateTime(timezone=True), default=datetime.utcnow)
+    atualizado_em = db.Column(db.DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            'gamer_id': self.gamer_id,
+            'pontuacao_total': self.pontuacao_total,
+            'total_respondidas': self.total_respondidas,
+            'total_acertos': self.total_acertos,
+            'ofensiva_atual': self.ofensiva_atual,
+            'recorde_ofensiva': self.recorde_ofensiva,
+            'data_ultima_missao_concluida': self.data_ultima_missao_concluida.isoformat() if self.data_ultima_missao_concluida else None,
+            'criado_em': self.criado_em.isoformat() if self.criado_em else None,
+            'atualizado_em': self.atualizado_em.isoformat() if self.atualizado_em else None
+        }
+
+
+class Questao(db.Model):
+    __tablename__ = 'questoes'
+
+    id = db.Column(db.BigInteger, primary_key=True)
+    autor = db.Column(db.String(150), nullable=False)
+    titulo = db.Column(db.String(150), nullable=False)
+    trecho_letra = db.Column(db.Text, nullable=False)
+    creditos = db.Column(db.String(255), nullable=True)
+    enunciado = db.Column(db.Text, nullable=False)
+
+    a = db.Column(db.Text, nullable=True)
+    b = db.Column(db.Text, nullable=True)
+    c = db.Column(db.Text, nullable=True)
+    d = db.Column(db.Text, nullable=True)
+    e = db.Column(db.Text, nullable=True)
+
+    alternativa_correta = db.Column(db.String(1), nullable=False)
+
+    musica_url = db.Column(db.String(500), nullable=False)
+    ano_lancamento = db.Column(db.Integer, nullable=True)
+    ano_prova = db.Column(db.Integer, nullable=True)
+    comentario = db.Column(db.Text, nullable=True)
+    curiosidade = db.Column(db.Text, nullable=True)
+
+    prova = db.Column(db.String(100), nullable=False)
+    matriz_enem = db.Column(db.String(100), nullable=True)
+    disciplina = db.Column(db.String(100), nullable=True)
+    data_exibicao = db.Column(db.Date, nullable=True)
+    ativo = db.Column(db.Boolean, nullable=False, default=True)
+
+    criado_em = db.Column(db.DateTime(timezone=True), default=datetime.utcnow)
+    atualizado_em = db.Column(db.DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    respostas = db.relationship('Resposta', backref='questao', lazy=True)
+
+    def to_dict(self, include_correct_answer=True):
+        data = {
+            'id': self.id,
+            'autor': self.autor,
+            'titulo': self.titulo,
+            'trecho_letra': self.trecho_letra,
+            'creditos': self.creditos,
+            'enunciado': self.enunciado,
+            'a': self.a,
+            'b': self.b,
+            'c': self.c,
+            'd': self.d,
+            'e': self.e,
+            'alternativas': {
+                'A': self.a,
+                'B': self.b,
+                'C': self.c,
+                'D': self.d,
+                'E': self.e
+            },
+            'musica_url': self.musica_url,
+            'ano_lancamento': self.ano_lancamento,
+            'ano_prova': self.ano_prova,
+            'comentario': self.comentario,
+            'curiosidade': self.curiosidade,
+            'prova': self.prova,
+            'matriz_enem': self.matriz_enem,
+            'disciplina': self.disciplina,
+            'data_exibicao': self.data_exibicao.isoformat() if self.data_exibicao else None,
+            'ativo': self.ativo
+        }
+
+        if include_correct_answer:
+            data['alternativa_correta'] = self.alternativa_correta
+
+        return data
+
+
+class Partida(db.Model):
+    __tablename__ = 'partidas'
+
+    id = db.Column(db.BigInteger, primary_key=True)
+    gamer_id = db.Column(db.BigInteger, db.ForeignKey('gamers.id'), nullable=False)
+
+    tipo = db.Column(db.String(50), nullable=False, default='daily')
+    status = db.Column(db.String(30), nullable=False, default='em_andamento')
+    origem = db.Column(db.String(50), nullable=True)
+
+    data_referencia = db.Column(db.Date, nullable=False, default=lambda: datetime.utcnow().date())
+    iniciada_em = db.Column(db.DateTime(timezone=True), default=datetime.utcnow)
+    finalizada_em = db.Column(db.DateTime(timezone=True), nullable=True)
+
+    questoes_previstas = db.Column(db.Integer, nullable=False, default=4)
+    questoes_respondidas = db.Column(db.Integer, nullable=False, default=0)
+    questoes_acertadas = db.Column(db.Integer, nullable=False, default=0)
+
+    tempo_total_segundos = db.Column(db.Integer, nullable=False, default=0)
+    pontuacao_total = db.Column(db.Integer, nullable=False, default=0)
+
+    missao_concluida = db.Column(db.Boolean, nullable=False, default=False)
+    ofensiva_gerada = db.Column(db.Boolean, nullable=False, default=False)
+
+    criado_em = db.Column(db.DateTime(timezone=True), default=datetime.utcnow)
+    atualizado_em = db.Column(db.DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    respostas = db.relationship(
+        'Resposta',
+        backref='partida',
+        lazy=True,
+        cascade='all, delete-orphan'
+    )
+
     def to_dict(self):
         return {
             'id': self.id,
-            'song_title': self.song_title,
-            'artist': self.artist,
-            'lyrics': self.lyrics,
-            'statement': self.statement,
-            'options': {
-                'A': self.option_a,
-                'B': self.option_b,
-                'C': self.option_c,
-                'D': self.option_d,
-                'E': self.option_e
-            },
-            'correct_answer': self.correct_answer,
-            'music_drive_url': self.get_direct_drive_url() if self.music_drive_url else None,
-            'composition_year': self.composition_year,
-            'enem_year': self.enem_year,
-            'comment': self.comment,
-            'curiosity': self.curiosity,
-            'category': self.category,
-            'credits': self.credits  # <--- E AQUI PARA ENVIAR PRO VUE
+            'gamer_id': self.gamer_id,
+            'tipo': self.tipo,
+            'status': self.status,
+            'origem': self.origem,
+            'data_referencia': self.data_referencia.isoformat() if self.data_referencia else None,
+            'iniciada_em': self.iniciada_em.isoformat() if self.iniciada_em else None,
+            'finalizada_em': self.finalizada_em.isoformat() if self.finalizada_em else None,
+            'questoes_previstas': self.questoes_previstas,
+            'questoes_respondidas': self.questoes_respondidas,
+            'questoes_acertadas': self.questoes_acertadas,
+            'tempo_total_segundos': self.tempo_total_segundos,
+            'pontuacao_total': self.pontuacao_total,
+            'missao_concluida': self.missao_concluida,
+            'ofensiva_gerada': self.ofensiva_gerada
         }
-    
-    def get_direct_drive_url(self):
-        if not self.music_drive_url:
-            return None
-        url = self.music_drive_url.strip()
-        patterns = [
-            r'/file/d/([a-zA-Z0-9_-]+)',
-            r'[?&]id=([a-zA-Z0-9_-]+)',
-            r'/open\?id=([a-zA-Z0-9_-]+)',
-        ]
-        import re
-        file_id = None
-        for pattern in patterns:
-            match = re.search(pattern, url)
-            if match:
-                file_id = match.group(1)
-                break
-        if not file_id:
-            return url
-        proxy_url = f'/api/audio/proxy?id={file_id}'
-        return proxy_url
 
-class QuizAttempt(db.Model):
-    __tablename__ = 'quiz_attempts'
-    
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-    question_id = db.Column(db.Integer, db.ForeignKey('questions.id'), nullable=False)
-    selected_answer = db.Column(db.String(1), nullable=False)
-    is_correct = db.Column(db.Boolean, nullable=False)
-    points = db.Column(db.Integer, nullable=False)  # Pontos ganhos ou perdidos nesta tentativa (+100 ou -35)
-    answered_at = db.Column(db.DateTime, default=datetime.now)
-    
-    question = db.relationship('Question', backref='attempts')
 
-def get_current_user():
-    # Passar db e User explicitamente
-    # Mas get_current_user também pode obtê-los automaticamente se necessário
-    return _get_current_user(db, User)
+class Resposta(db.Model):
+    __tablename__ = 'respostas'
 
-def sync_user_to_sheets_async(user_id, max_retries=3, delay=1):
-    """
-    Executa a sincronização com Google Sheets de forma assíncrona e com retry.
-    Esta função roda em uma thread separada para não bloquear a resposta da API.
-    """
-    # Obter dados do usuário ANTES de entrar na thread para evitar problemas de contexto
-    user_data = None
-    try:
-        user = User.query.get(user_id)
-        if user:
-            # Obter estatísticas do usuário
-            attempts = QuizAttempt.query.filter_by(user_id=user_id).all()
-            total_attempts = len(attempts)
-            correct_attempts = sum(1 for a in attempts if a.is_correct)
-            accuracy = round((correct_attempts / total_attempts * 100) if total_attempts > 0 else 0, 2)
-            
-            user_data = {
-                'id': user.id,
-                'nickname': user.nickname,
-                'email': user.email,
-                'total_attempts': total_attempts,
-                'correct_attempts': correct_attempts,
-                'accuracy': accuracy,
-                'total_score': user.total_score
-            }
-    except Exception as e:
-        app.logger.warning(f'[SYNC-ASYNC] Could not fetch user data before sync: {e}')
-        # Continuar mesmo assim, a função sync_user_to_sheets tentará buscar os dados
-    
-    def sync_with_retry():
-        from google_sheets import sync_user_to_sheets_with_data, sync_user_to_sheets
-        from flask import current_app
-        
-        # Criar um novo contexto da aplicação para a thread
-        with app.app_context():
-            for attempt in range(1, max_retries + 1):
-                try:
-                    current_app.logger.info(f'[SYNC-ASYNC] Attempting to sync user {user_id} (attempt {attempt}/{max_retries})')
-                    
-                    # Se temos os dados, usar a função que não precisa fazer queries
-                    if user_data:
-                        sync_result = sync_user_to_sheets_with_data(user_id, user_data)
-                    else:
-                        # Fallback: tentar buscar os dados dentro da thread
-                        from google_sheets import sync_user_to_sheets
-                        sync_result = sync_user_to_sheets(user_id)
-                    
-                    if sync_result.get('success'):
-                        current_app.logger.info(f'[SYNC-ASYNC] Successfully synced user {user_id} to Google Sheets')
-                        return
-                    else:
-                        error = sync_result.get('error', 'Unknown error')
-                        current_app.logger.warning(f'[SYNC-ASYNC] Sync failed for user {user_id} (attempt {attempt}/{max_retries}): {error}')
-                        
-                        if attempt < max_retries:
-                            current_app.logger.info(f'[SYNC-ASYNC] Retrying in {delay} seconds...')
-                            time.sleep(delay)
-                        else:
-                            current_app.logger.error(f'[SYNC-ASYNC] Failed to sync user {user_id} after {max_retries} attempts')
-                            
-                except Exception as e:
-                    current_app.logger.error(f'[SYNC-ASYNC] Exception while syncing user {user_id} (attempt {attempt}/{max_retries}): {str(e)}', exc_info=True)
-                    
-                    if attempt < max_retries:
-                        current_app.logger.info(f'[SYNC-ASYNC] Retrying in {delay} seconds...')
-                        time.sleep(delay)
-                    else:
-                        current_app.logger.error(f'[SYNC-ASYNC] Failed to sync user {user_id} after {max_retries} attempts due to exception')
-    
-    # Executar em thread separada
-    thread = threading.Thread(target=sync_with_retry, daemon=True)
-    thread.start()
-    app.logger.info(f'[SYNC-ASYNC] Started async sync thread for user {user_id}')
+    id = db.Column(db.BigInteger, primary_key=True)
+    partida_id = db.Column(db.BigInteger, db.ForeignKey('partidas.id'), nullable=False)
+    gamer_id = db.Column(db.BigInteger, db.ForeignKey('gamers.id'), nullable=False)
+    questao_id = db.Column(db.BigInteger, db.ForeignKey('questoes.id'), nullable=False)
+
+    alternativa_selecionada = db.Column(db.String(1), nullable=False)
+    acertou = db.Column(db.Boolean, nullable=False)
+    pontos_ganhos = db.Column(db.Integer, nullable=False, default=0)
+    tempo_gasto_segundos = db.Column(db.Integer, nullable=True)
+
+    respondida_em = db.Column(db.DateTime(timezone=True), default=datetime.utcnow)
+    criado_em = db.Column(db.DateTime(timezone=True), default=datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'partida_id': self.partida_id,
+            'gamer_id': self.gamer_id,
+            'questao_id': self.questao_id,
+            'alternativa_selecionada': self.alternativa_selecionada,
+            'acertou': self.acertou,
+            'pontos_ganhos': self.pontos_ganhos,
+            'tempo_gasto_segundos': self.tempo_gasto_segundos,
+            'respondida_em': self.respondida_em.isoformat() if self.respondida_em else None
+        }
+
+
+def get_or_create_estatisticas(gamer_id):
+    stats = EstatisticaGamer.query.filter_by(gamer_id=gamer_id).first()
+    if not stats:
+        stats = EstatisticaGamer(gamer_id=gamer_id)
+        db.session.add(stats)
+        db.session.commit()
+    return stats
+
+
+def get_brazil_today():
+    fuso_br = timezone(timedelta(hours=-3))
+    return datetime.now(fuso_br).date()
+
+
+def get_or_create_daily_partida(gamer_id, origem='questoes_do_dia'):
+    hoje = get_brazil_today()
+
+    partida = Partida.query.filter_by(
+        gamer_id=gamer_id,
+        tipo='daily',
+        data_referencia=hoje,
+        status='em_andamento'
+    ).order_by(Partida.id.desc()).first()
+
+    if partida:
+        return partida
+
+    partida = Partida(
+        gamer_id=gamer_id,
+        tipo='daily',
+        status='em_andamento',
+        origem=origem,
+        data_referencia=hoje,
+        questoes_previstas=4
+    )
+    db.session.add(partida)
+    db.session.commit()
+    return partida
+
+
+def serialize_question_with_user_context(questao, gamer=None):
+    question_dict = questao.to_dict()
+
+    if gamer:
+        previous_answer = Resposta.query.filter_by(
+            gamer_id=gamer.id,
+            questao_id=questao.id
+        ).order_by(Resposta.respondida_em.desc()).first()
+
+        if previous_answer:
+            question_dict['already_answered'] = True
+            question_dict['previous_result'] = previous_answer.acertou
+            question_dict['previous_answer'] = previous_answer.alternativa_selecionada
+        else:
+            question_dict['already_answered'] = False
+            question_dict['previous_result'] = None
+            question_dict['previous_answer'] = None
+    else:
+        question_dict['already_answered'] = False
+        question_dict['previous_result'] = None
+        question_dict['previous_answer'] = None
+
+    return question_dict
+
 
 @app.route('/api/health', methods=['GET'])
 def health_check():
     return jsonify({'status': 'ok', 'message': 'Quiz API is running'}), 200
 
+
 @app.route('/api/questions', methods=['GET'])
 @optional_auth
 def get_questions():
-    # Filtrar por categoria se fornecida
-    category = request.args.get('category', None)
-    query = Question.query
-    
-    if category:
-        # Normalizar categoria para corresponder aos valores válidos
-        valid_categories = ['Unicamp', 'Fuvest', 'Enem', 'Outros']
-        category_normalized = category.capitalize()
-        if category_normalized in valid_categories:
-            query = query.filter(Question.category == category_normalized)
+    filtro_prova = request.args.get('prova') or request.args.get('categoria') or request.args.get('category')
+    query = Questao.query.filter_by(ativo=True)
+
+    if filtro_prova:
+        valid_provas = ['Unicamp', 'Fuvest', 'Enem', 'Outros']
+        prova_normalized = filtro_prova.capitalize()
+        if prova_normalized in valid_provas:
+            query = query.filter(Questao.prova == prova_normalized)
         else:
-            # Tentar mapear variações
-            category_lower = category.lower()
-            if category_lower in ['unicamp', 'unicampo']:
-                query = query.filter(Question.category == 'Unicamp')
-            elif category_lower == 'fuvest':
-                query = query.filter(Question.category == 'Fuvest')
-            elif category_lower == 'enem':
-                query = query.filter(Question.category == 'Enem')
-            elif category_lower in ['outros', 'other', 'others']:
-                query = query.filter(Question.category == 'Outros')
-            # Se categoria inválida, retornar todas as questões (sem filtro)
-    
-    questions = query.all()
-    questions_list = []
-    
-    # Verificar se o usuário já respondeu cada questão (se autenticado)
-    user = request.current_user if hasattr(request, 'current_user') else None
-    
-    for q in questions:
-        question_dict = q.to_dict()
-        
-        if user:
-            previous_attempt = QuizAttempt.query.filter_by(
-                user_id=user.id,
-                question_id=q.id
-            ).order_by(QuizAttempt.answered_at.desc()).first()
-            
-            if previous_attempt:
-                question_dict['already_answered'] = True
-                question_dict['previous_result'] = previous_attempt.is_correct
-                question_dict['previous_answer'] = previous_attempt.selected_answer
-            else:
-                question_dict['already_answered'] = False
-                question_dict['previous_result'] = None
-                question_dict['previous_answer'] = None
-        else:
-            question_dict['already_answered'] = False
-            question_dict['previous_result'] = None
-            question_dict['previous_answer'] = None
-        
-        questions_list.append(question_dict)
-    
+            prova_lower = filtro_prova.lower()
+            if prova_lower in ['unicamp', 'unicampo']:
+                query = query.filter(Questao.prova == 'Unicamp')
+            elif prova_lower == 'fuvest':
+                query = query.filter(Questao.prova == 'Fuvest')
+            elif prova_lower == 'enem':
+                query = query.filter(Questao.prova == 'Enem')
+            elif prova_lower in ['outros', 'other', 'others']:
+                query = query.filter(Questao.prova == 'Outros')
+
+    questoes = query.order_by(Questao.id.asc()).all()
+    gamer = request.current_user if hasattr(request, 'current_user') else None
+
+    questions_list = [serialize_question_with_user_context(q, gamer) for q in questoes]
     return jsonify(questions_list), 200
+
 
 @app.route('/api/questions/<int:question_id>', methods=['GET'])
 @optional_auth
 def get_question(question_id):
-    question = Question.query.get_or_404(question_id)
-    question_dict = question.to_dict()
-    question_dict.pop('correct_answer', None)
-    
-    # Verificar se o usuário já respondeu esta questão (se autenticado)
-    user = request.current_user if hasattr(request, 'current_user') else None
-    
-    if user:
-        previous_attempt = QuizAttempt.query.filter_by(
-            user_id=user.id,
-            question_id=question_id
-        ).order_by(QuizAttempt.answered_at.desc()).first()
-        
-        if previous_attempt:
-            question_dict['already_answered'] = True
-            question_dict['previous_result'] = previous_attempt.is_correct
-            question_dict['previous_answer'] = previous_attempt.selected_answer
-        else:
-            question_dict['already_answered'] = False
-    else:
-        question_dict['already_answered'] = False
-    
+    questao = Questao.query.filter_by(id=question_id, ativo=True).first_or_404()
+    gamer = request.current_user if hasattr(request, 'current_user') else None
+    question_dict = serialize_question_with_user_context(questao, gamer)
     return jsonify(question_dict), 200
+
 
 @app.route('/api/questions/random', methods=['GET'])
 def get_random_question():
-    question = Question.query.order_by(db.func.random()).first()
-    if not question:
-        return jsonify({'error': 'No questions available'}), 404
-    question_dict = question.to_dict()
-    question_dict.pop('correct_answer', None)
+    questao = Questao.query.filter_by(ativo=True).order_by(db.func.random()).first()
+    if not questao:
+        return jsonify({'error': 'Nenhuma questão encontrada'}), 404
+
+    question_dict = questao.to_dict(include_correct_answer=False)
     return jsonify(question_dict), 200
+
 
 @app.route('/api/questions/<int:question_id>/check', methods=['POST'])
 @login_required
 def check_answer(question_id):
-    user = request.current_user
-    data = request.get_json()
-    selected_answer = data.get('selected_answer')
-    
+    debug_auth_context("CHECK_ANSWER_ROUTE_ENTERED")
+
+    gamer = request.current_user
+    stats = get_or_create_estatisticas(gamer.id)
+    data = request.get_json() or {}
+
+    selected_answer = (data.get('selected_answer') or data.get('alternativa_selecionada') or '').strip().upper()
+    partida_id = data.get('partida_id')
+    time_spent = data.get('time_spent', data.get('tempo_gasto_segundos', 15))
+
     if not selected_answer:
-        return jsonify({'error': 'selected_answer is required'}), 400
-    
-    question = Question.query.get_or_404(question_id)
-    is_correct = selected_answer.upper() == question.correct_answer.upper()
-    
-    # Verificar se o usuário já respondeu esta questão antes
-    previous_attempt = QuizAttempt.query.filter_by(
-        user_id=user.id,
-        question_id=question_id
-    ).order_by(QuizAttempt.answered_at.desc()).first()
-    
-    already_answered = previous_attempt is not None
-    points = 0
-    points_earned = False
-    
-    if not already_answered:
-        # Primeira vez respondendo - calcular pontos normalmente
-        points = 100 if is_correct else -35
-        
-        # Atualizar pontuação total do usuário (garantindo que nunca fique negativa)
-        user.update_score(points)
-        
-        # Atualizar tempo de jogo (usando o tempo do front, ou 15 segundos padrão)
-        time_spent = data.get('time_spent', 15)
-        user.total_play_time = (user.total_play_time or 0) + time_spent
-        
-        # Atualizar Ofensiva (Streak)
-        hoje = datetime.now().date()
-        if user.last_play_date != hoje:
-            if user.last_play_date == hoje - timedelta(days=1):
-                user.current_streak = (user.current_streak or 0) + 1
-            else:
-                user.current_streak = 1
-            user.last_play_date = hoje
-        
-        points_earned = True
-        
-        # Salvar a tentativa apenas se for a primeira vez
-        attempt = QuizAttempt(
-            user_id=user.id,
-            question_id=question_id,
-            selected_answer=selected_answer.upper(),
-            is_correct=is_correct,
-            points=points
-        )
-        
-        db.session.add(attempt)
-        db.session.commit()
-        
-        # Sincronizar com Google Sheets apenas se ganhou/perdeu pontos
-        sync_user_to_sheets_async(user.id)
-        
-        app.logger.info(f'[ATTEMPT] User {user.id} answered question {question_id} for the first time. Correct: {is_correct}, Points: {points}, Total Score: {user.total_score}')
+        return jsonify({'error': 'Alternativa selecionada é obrigatória'}), 400
+
+    if selected_answer not in ['A', 'B', 'C', 'D', 'E']:
+        return jsonify({'error': 'Alternativa inválida'}), 400
+
+    questao = Questao.query.filter_by(id=question_id, ativo=True).first_or_404()
+    is_correct = selected_answer == questao.alternativa_correta.upper()
+
+    hoje = get_brazil_today()
+
+    partida = None
+    if partida_id:
+        partida = Partida.query.filter_by(id=partida_id, gamer_id=gamer.id).first()
+        if not partida:
+            return jsonify({'error': 'Partida não encontrada para este usuário'}), 404
     else:
-        # Já respondeu antes - NÃO salvar tentativa, NÃO atualizar ranking, NÃO fazer nada
-        app.logger.info(f'[ATTEMPT] User {user.id} attempting question {question_id} again (already answered before) - NO changes to ranking/score')
-        # Não fazer commit, não salvar tentativa, não atualizar nada
-    
+        partida = get_or_create_daily_partida(gamer.id, origem='check_answer')
+
+    if partida.status != 'em_andamento':
+        return jsonify({'error': 'Esta partida já foi encerrada.'}), 400
+
+    if partida.data_referencia != hoje:
+        return jsonify({'error': 'Esta partida não pertence ao dia atual.'}), 400
+
+    resposta_existente_na_partida = Resposta.query.filter_by(
+        partida_id=partida.id,
+        questao_id=question_id
+    ).first()
+
+    if resposta_existente_na_partida:
+        return jsonify({
+            'is_correct': resposta_existente_na_partida.acertou,
+            'correct_answer': questao.alternativa_correta,
+            'points': 0,
+            'total_score': stats.pontuacao_total,
+            'already_answered': True,
+            'points_earned': False,
+            'limite_diario_atingido': partida.questoes_respondidas >= partida.questoes_previstas,
+            'missao_cumprida_agora': False,
+            'nova_ofensiva': stats.ofensiva_atual,
+            'novo_recorde': stats.recorde_ofensiva,
+            'previous_result': resposta_existente_na_partida.acertou,
+            'partida_id': partida.id
+        }), 200
+
+    if partida.questoes_respondidas >= partida.questoes_previstas:
+        return jsonify({
+            "error": "Você já completou as 4 questões de hoje!",
+            "limit_reached": True,
+            "partida_id": partida.id
+        }), 403
+
+    points = 100 if is_correct else -35
+
+    resposta = Resposta(
+        partida_id=partida.id,
+        gamer_id=gamer.id,
+        questao_id=question_id,
+        alternativa_selecionada=selected_answer,
+        acertou=is_correct,
+        pontos_ganhos=points,
+        tempo_gasto_segundos=time_spent
+    )
+    db.session.add(resposta)
+
+    partida.questoes_respondidas += 1
+    if is_correct:
+        partida.questoes_acertadas += 1
+    partida.pontuacao_total += points
+    partida.tempo_total_segundos += max(int(time_spent or 0), 0)
+
+    stats.total_respondidas += 1
+    if is_correct:
+        stats.total_acertos += 1
+    stats.pontuacao_total = max((stats.pontuacao_total or 0) + points, 0)
+
+    missao_cumprida_agora = False
+
+    if partida.questoes_respondidas >= partida.questoes_previstas:
+        partida.status = 'finalizada'
+        partida.finalizada_em = datetime.utcnow()
+        partida.missao_concluida = True
+
+        if stats.data_ultima_missao_concluida == hoje - timedelta(days=1):
+            stats.ofensiva_atual += 1
+        elif stats.data_ultima_missao_concluida == hoje:
+            pass
+        else:
+            stats.ofensiva_atual = 1
+
+        if stats.data_ultima_missao_concluida != hoje:
+            stats.data_ultima_missao_concluida = hoje
+            partida.ofensiva_gerada = True
+            missao_cumprida_agora = True
+
+        if stats.ofensiva_atual > stats.recorde_ofensiva:
+            stats.recorde_ofensiva = stats.ofensiva_atual
+
+    db.session.commit()
+
+    app.logger.info(f'[JOGO] Gamer {gamer.id} respondeu questao {question_id}. Acertou: {is_correct}')
+
     return jsonify({
         'is_correct': is_correct,
-        'correct_answer': question.correct_answer,
+        'correct_answer': questao.alternativa_correta,
         'points': points,
-        'total_score': user.total_score,
-        'already_answered': already_answered,
-        'points_earned': points_earned,
-        'previous_result': previous_attempt.is_correct if previous_attempt else None
+        'total_score': stats.pontuacao_total,
+        'already_answered': False,
+        'points_earned': True,
+        'limite_diario_atingido': partida.questoes_respondidas >= partida.questoes_previstas,
+        'missao_cumprida_agora': missao_cumprida_agora,
+        'nova_ofensiva': stats.ofensiva_atual,
+        'novo_recorde': stats.recorde_ofensiva,
+        'previous_result': None,
+        'partida_id': partida.id
     }), 200
+
 
 @app.route('/api/auth/register', methods=['POST'])
 def register_user():
-    data = request.get_json()
-    
-    if not data.get('nickname') or not data.get('email') or not data.get('password'):
-        return jsonify({'error': 'nickname, email and password are required'}), 400
-    
-    if len(data.get('password', '')) < 6:
-        return jsonify({'error': 'Password must be at least 6 characters'}), 400
-    
-    if User.query.filter_by(email=data['email']).first():
-        return jsonify({'error': 'Email already registered'}), 400
-    
-    if User.query.filter_by(nickname=data['nickname']).first():
-        return jsonify({'error': 'Nickname already taken'}), 400
-    
-    from werkzeug.security import generate_password_hash
-    user = User(
-        nickname=data['nickname'],
-        email=data['email'],
-        password_hash=generate_password_hash(data['password'])
+    data = request.get_json() or {}
+
+    nome = data.get('nickname') or data.get('nome')
+    email = data.get('email')
+    password = data.get('password') or data.get('senha')
+
+    if not nome or not email or not password:
+        return jsonify({'error': 'Nome, email e senha são obrigatórios'}), 400
+
+    if len(password) < 6:
+        return jsonify({'error': 'A senha deve ter pelo menos 6 caracteres'}), 400
+
+    if Gamer.query.filter_by(email=email).first():
+        return jsonify({'error': 'Email já cadastrado'}), 400
+
+    if Gamer.query.filter_by(nome=nome).first():
+        return jsonify({'error': 'Nickname já em uso'}), 400
+
+    gamer = Gamer(
+        nome=nome,
+        email=email,
+        password_hash=generate_password_hash(password)
     )
-    
-    db.session.add(user)
-    db.session.commit()
-    
-    # Registrar último login
-    user.last_login = datetime.now()
+
+    db.session.add(gamer)
     db.session.commit()
 
-    from auth import generate_token
-    token = generate_token(user.id, app.config['SECRET_KEY'], expires_in=3600 * 24)
-    
-    # Sincronizar com Google Sheets de forma assíncrona (não bloqueia a resposta)
-    app.logger.info(f'[REGISTER] User {user.id} ({user.nickname}) registered, triggering async sync')
-    sync_user_to_sheets_async(user.id)
-    
-    response = make_response(jsonify({
-        'message': 'User created successfully',
-        'user': user.to_dict()
-    }))
-    
-    response.set_cookie(
-        'access_token',
-        token,
-        max_age=3600 * 24,
-        httponly=True,
-        samesite='Lax',
-        secure=False,
-        path='/'
-    )
-    
-    return response, 201
+    estatisticas = EstatisticaGamer(gamer_id=gamer.id)
+    db.session.add(estatisticas)
+
+    gamer.ultimo_login = datetime.utcnow()
+    db.session.commit()
+
+    return jsonify({
+        'message': 'Gamer criado com sucesso',
+        'user': gamer.to_dict()
+    }), 201
+
 
 @app.route('/api/auth/login', methods=['POST'])
 def login_user():
-    data = request.get_json()
-    
-    if not data.get('email') or not data.get('password'):
-        return jsonify({'error': 'email/username and password are required'}), 400
-    
-    # Tentar encontrar usuário por email ou nickname
-    email_or_username = data['email'].strip()
-    user = User.query.filter(
-        (User.email == email_or_username) | (User.nickname == email_or_username)
+    data = request.get_json() or {}
+
+    identificador = data.get('email') or data.get('username') or data.get('nome')
+    password = data.get('password') or data.get('senha')
+
+    if not identificador or not password:
+        return jsonify({'error': 'Login e senha são obrigatórios'}), 400
+
+    identificador = identificador.strip()
+    gamer = Gamer.query.filter(
+        (Gamer.email == identificador) | (Gamer.nome == identificador)
     ).first()
-    
-    # Sincronizar questões automaticamente após login bem-sucedido (antes de verificar senha)
-    # Isso será feito em background após o login ser confirmado
-    
-    if not user:
-        return jsonify({'error': 'Senha Incorreta!'}), 401
-    
-    if not user.check_password(data['password']):
-        return jsonify({'error': 'Senha Incorreta!'}), 401
-    
-    # Registrar último login
-    user.last_login = datetime.now()
+
+    if not gamer or not gamer.check_password(password):
+        return jsonify({'error': 'Senha Incorreta ou Jogador não encontrado!'}), 401
+
+    get_or_create_estatisticas(gamer.id)
+
+    gamer.ultimo_login = datetime.utcnow()
     db.session.commit()
 
-    from auth import generate_token
-    token = generate_token(user.id, app.config['SECRET_KEY'], expires_in=3600 * 24)
-    
-    # Sincronizar questões automaticamente após login bem-sucedido (em background)
-    def sync_on_login():
-        try:
-            with app.app_context():
-                from google_sheets import sync_questions_from_sheets
-                app.logger.info(f'[LOGIN-SYNC] User {user.id} logged in, syncing questions...')
-                result = sync_questions_from_sheets()
-                if result.get('success'):
-                    added = result.get('added', 0)
-                    if added > 0:
-                        app.logger.info(f'[LOGIN-SYNC] ✓ {added} new question(s) synced after login')
-                    else:
-                        app.logger.debug(f'[LOGIN-SYNC] No new questions found')
-                else:
-                    app.logger.warning(f'[LOGIN-SYNC] Sync failed: {result.get("error")}')
-        except Exception as e:
-            app.logger.error(f'[LOGIN-SYNC] Error syncing questions on login: {str(e)}', exc_info=True)
-    
-    # Executar sincronização em thread separada para não bloquear o login
-    sync_thread = threading.Thread(target=sync_on_login, daemon=True, name='LoginSync')
-    sync_thread.start()
-    
-    response = make_response(jsonify({
-        'message': 'Login successful',
-        'user': user.to_dict()
-    }))
-    
-    response.set_cookie(
-        'access_token',
-        token,
-        max_age=3600 * 24,
-        httponly=True,
-        samesite='Lax',
-        secure=False,
-        path='/'
-    )
-    
-    return response, 200
+    return jsonify({
+        'message': 'Login realizado com sucesso',
+        'user': gamer.to_dict()
+    }), 200
+
 
 @app.route('/api/auth/logout', methods=['POST'])
 @login_required
 def logout_user():
-    response = make_response(jsonify({'message': 'Logout successful'}))
-    response.set_cookie('access_token', '', expires=0)
-    return response, 200
+    gamer = request.current_user
+    gamer.ultimo_logout = datetime.utcnow()
+    db.session.commit()
+
+    return jsonify({'message': 'Logout efetuado'}), 200
+
 
 @app.route('/api/auth/me', methods=['GET'])
 @login_required
 def get_current_user_info():
-    user = request.current_user
-    return jsonify({'user': user.to_dict(include_email=True)}), 200
+    gamer = request.current_user
+    get_or_create_estatisticas(gamer.id)
+    return jsonify({'user': gamer.to_dict(include_email=True)}), 200
+
 
 @app.route('/api/auth/verify', methods=['GET'])
 def verify_auth():
-    # Sempre passar db e User explicitamente
-    user = get_current_user()
-    if user:
-        return jsonify({'authenticated': True, 'user': user.to_dict()}), 200
+    gamer = _get_current_user()
+    if gamer:
+        get_or_create_estatisticas(gamer.id)
+        return jsonify({'authenticated': True, 'user': gamer.to_dict()}), 200
     return jsonify({'authenticated': False}), 200
+
 
 @app.route('/api/users/me/stats', methods=['GET'])
 @login_required
 def get_user_stats():
-    user = request.current_user
-    
-    attempts = QuizAttempt.query.filter_by(user_id=user.id).all()
-    total_attempts = len(attempts)
-    correct_attempts = sum(1 for a in attempts if a.is_correct)
-    accuracy = (correct_attempts / total_attempts * 100) if total_attempts > 0 else 0
-    
-    # Garantir que a pontuação não seja negativa
-    user.ensure_non_negative_score()
-    
-    # Calcular pontuação total (pode ser diferente de user.total_score se houver inconsistências)
-    total_points = sum(a.points for a in attempts) if attempts else 0
-    # Garantir que pontos calculados também não sejam negativos
-    total_points = max(0, total_points)
-    
+    gamer = request.current_user
+    stats = get_or_create_estatisticas(gamer.id)
+
+    accuracy = (stats.total_acertos / stats.total_respondidas * 100) if stats.total_respondidas > 0 else 0
+
     return jsonify({
-        'user_id': user.id,
-        'total_quizzes': total_attempts,
-        'correct_answers': correct_attempts,
+        'user_id': gamer.id,
+        'total_quizzes': stats.total_respondidas,
+        'correct_answers': stats.total_acertos,
         'accuracy': round(accuracy, 2),
-        'total_score': user.total_score,  # Sempre >= 0
-        'total_points_calculated': total_points  # Sempre >= 0
+        'total_score': stats.pontuacao_total,
+        'total_points_calculated': stats.pontuacao_total,
+        'ofensiva': stats.ofensiva_atual,
+        'recorde_ofensiva': stats.recorde_ofensiva
     }), 200
+
 
 @app.route('/api/users/me/attempts', methods=['POST'])
 @login_required
 def save_attempt():
-    user = request.current_user
-    data = request.get_json()
-    
-    if not data.get('question_id') or not data.get('selected_answer'):
-        return jsonify({'error': 'question_id and selected_answer are required'}), 400
-    
-    question = Question.query.get_or_404(data['question_id'])
-    is_correct = data['selected_answer'].upper() == question.correct_answer.upper()
-    
-    # Calcular pontuação: +100 para acertos, -35 para erros
-    points = 100 if is_correct else -35
-    
-    # Atualizar pontuação total do usuário (garantindo que nunca fique negativa)
-    user.update_score(points)
-    
-    # Atualizar tempo de jogo (usando o tempo do front, ou 15 segundos padrão)
-    time_spent = data.get('time_spent', 15)
-    user.total_play_time = (user.total_play_time or 0) + time_spent
-    
-    # Atualizar Ofensiva (Streak)
-    hoje = datetime.now().date()
-    if user.last_play_date != hoje:
-        if user.last_play_date == hoje - timedelta(days=1):
-            user.current_streak = (user.current_streak or 0) + 1
-        else:
-            user.current_streak = 1
-        user.last_play_date = hoje
-    
-    attempt = QuizAttempt(
-        user_id=user.id,
-        question_id=data['question_id'],
-        selected_answer=data['selected_answer'].upper(),
-        is_correct=is_correct,
-        points=points
-    )
-    
-    db.session.add(attempt)
-    db.session.commit()
-    
-    app.logger.info(f'[ATTEMPT] User {user.id} answered question. Correct: {is_correct}, Points: {points}, Total Score: {user.total_score}')
-    
-    # Sincronizar com Google Sheets de forma assíncrona (não bloqueia a resposta)
-    app.logger.info(f'[ATTEMPT] User {user.id} answered question, triggering async sync')
-    sync_user_to_sheets_async(user.id)
-    
-    return jsonify({
-        'message': 'Attempt saved',
-        'is_correct': is_correct,
-        'correct_answer': question.correct_answer,
-        'points': points,
-        'total_score': user.total_score
-    }), 201
+    data = request.get_json() or {}
+    question_id = data.get('question_id')
+    if not question_id:
+        return jsonify({'error': 'question_id é obrigatório'}), 400
+    return check_answer(question_id)
+
 
 @app.route('/api/users/me/profile', methods=['PUT'])
 @login_required
 def update_profile():
-    user = request.current_user
-    data = request.get_json()
-    
+    gamer = request.current_user
+    data = request.get_json() or {}
+
     if data.get('email'):
-        existing_user = User.query.filter_by(email=data['email']).first()
-        if existing_user and existing_user.id != user.id:
-            return jsonify({'error': 'Email already in use'}), 400
-        user.email = data['email']
-    
-    if data.get('password'):
-        from werkzeug.security import generate_password_hash
-        user.password_hash = generate_password_hash(data['password'])
-    
+        existing = Gamer.query.filter_by(email=data['email']).first()
+        if existing and existing.id != gamer.id:
+            return jsonify({'error': 'Email já está em uso'}), 400
+        gamer.email = data['email']
+
+    if data.get('password') or data.get('senha'):
+        senha = data.get('password') or data.get('senha')
+        gamer.password_hash = generate_password_hash(senha)
+
     db.session.commit()
-    
-    # Sincronizar com Google Sheets de forma assíncrona (não bloqueia a resposta)
-    app.logger.info(f'[PROFILE] User {user.id} updated profile, triggering async sync')
-    sync_user_to_sheets_async(user.id)
-    
-    return jsonify({'message': 'Profile updated', 'user': user.to_dict(include_email=True)}), 200
+    return jsonify({'message': 'Perfil atualizado', 'user': gamer.to_dict(include_email=True)}), 200
+
+
+@app.route('/api/partidas', methods=['POST'])
+@login_required
+def salvar_historico_partida():
+    gamer = request.current_user
+    data = request.get_json() or {}
+
+    partida = Partida(
+        gamer_id=gamer.id,
+        tipo=data.get('tipo', 'daily'),
+        status=data.get('status', 'finalizada'),
+        origem=data.get('origem', 'frontend'),
+        data_referencia=get_brazil_today(),
+        iniciada_em=datetime.utcnow(),
+        finalizada_em=datetime.utcnow(),
+        questoes_previstas=data.get('questoes_previstas', 4),
+        questoes_respondidas=data.get('questoes_respondidas', 0),
+        questoes_acertadas=data.get('questoes_acertadas', 0),
+        tempo_total_segundos=data.get('tempo_total_segundos', 0),
+        pontuacao_total=data.get('pontos_ganhos', data.get('pontuacao_total', 0)),
+        missao_concluida=data.get('missao_concluida', False),
+        ofensiva_gerada=data.get('ofensiva_gerada', False)
+    )
+
+    db.session.add(partida)
+    db.session.commit()
+
+    return jsonify({
+        'message': 'Partida salva com sucesso!',
+        'partida_id': partida.id
+    }), 201
+
 
 @app.route('/api/ranking', methods=['GET'])
 def get_ranking():
-    from datetime import datetime, timedelta
-    
-    period = request.args.get('period', 'all')  # all, week, month
-    
-    # Calcular data de corte baseada no período
-    cutoff_date = None
-    if period == 'week':
-        cutoff_date = datetime.now() - timedelta(days=7)
-    elif period == 'month':
-        cutoff_date = datetime.now() - timedelta(days=30)
-    
-    users = User.query.all()
+    gamers = Gamer.query.all()
     ranking = []
-    
-    for user in users:
-        # Garantir que a pontuação não seja negativa
-        user.ensure_non_negative_score()
-        
-        # Filtrar tentativas por período se necessário
-        if cutoff_date:
-            attempts = QuizAttempt.query.filter_by(user_id=user.id).filter(
-                QuizAttempt.answered_at >= cutoff_date
-            ).all()
-            # Para períodos específicos, mostrar usuários mesmo sem tentativas (com pontuação 0)
-        else:
-            attempts = QuizAttempt.query.filter_by(user_id=user.id).all()
-            # Para "all", mostrar todos os usuários, mesmo sem tentativas
-        
-        total = len(attempts)
-        correct = sum(1 for a in attempts if a.is_correct)
-        accuracy = (correct / total * 100) if total > 0 else 0
-        
-        # Calcular pontuação do período ou usar total_score
-        if cutoff_date:
-            # Para períodos específicos, calcular apenas os pontos das tentativas no período
-            if attempts:
-                period_score = sum(a.points for a in attempts)
-                if period_score < 0:
-                    period_score = 0
-                total_score = period_score
-            else:
-                # Sem tentativas no período, pontuação 0
-                total_score = 0
-        else:
-            # Para "all", usar o total_score do usuário (mesmo que seja 0)
-            total_score = user.total_score if user.total_score else 0
-        
+
+    fuso_br = timezone(timedelta(hours=-3))
+    hoje = datetime.now(fuso_br).date()
+
+    for g in gamers:
+        stats = g.estatisticas
+        total_respondidas = stats.total_respondidas if stats else 0
+        total_acertos = stats.total_acertos if stats else 0
+        pontuacao_total = stats.pontuacao_total if stats else 0
+        recorde_ofensiva = stats.recorde_ofensiva if stats else 0
+        ofensiva_atual = stats.ofensiva_atual if stats else 0
+        data_ultima = stats.data_ultima_missao_concluida if stats else None
+
+        accuracy = (total_acertos / total_respondidas * 100) if total_respondidas > 0 else 0
+
+        ofensiva_real = ofensiva_atual
+        if data_ultima and (hoje - data_ultima).days > 1:
+            ofensiva_real = 0
+
         ranking.append({
-            'user_id': user.id,
-            'nickname': user.nickname,
-            'total_quizzes': total,
-            'correct_answers': correct,
+            'user_id': g.id,
+            'nickname': g.nome,
+            'total_quizzes': total_respondidas,
+            'correct_answers': total_acertos,
             'accuracy': round(accuracy, 2),
-            'total_score': total_score
+            'total_score': pontuacao_total,
+            'ofensiva': ofensiva_real,
+            'recorde_ofensiva': recorde_ofensiva
         })
-    
-    # Garantir que todas as pontuações sejam não-negativas antes de ordenar
-    for entry in ranking:
-        if entry['total_score'] < 0:
-            entry['total_score'] = 0
-    
-    # Ordenar por pontuação total (maior primeiro), depois por acurácia, depois por acertos
+
     ranking.sort(key=lambda x: (x['total_score'], x['accuracy'], x['correct_answers']), reverse=True)
-    
+
     for i, entry in enumerate(ranking, 1):
         entry['position'] = i
-    
+
     return jsonify(ranking), 200
 
-@app.route('/api/sheets/sync-user', methods=['POST'])
-@login_required
-def sync_user_to_sheets_endpoint():
-    user = request.current_user
-    from google_sheets import sync_user_to_sheets
-    result = sync_user_to_sheets(user.id)
-    
-    app.logger.info(f'Sync result for user {user.id}: {result}')
-    
-    if result['success']:
-        return jsonify(result), 200
-    return jsonify(result), 400
-
-@app.route('/api/sheets/sync-ranking', methods=['POST'])
-@login_required
-def sync_ranking_to_sheets_endpoint():
-    from google_sheets import sync_ranking_to_sheets
-    result = sync_ranking_to_sheets()
-    
-    if result['success']:
-        return jsonify(result), 200
-    return jsonify(result), 400
-
-@app.route('/api/sheets/test', methods=['GET'])
-@login_required
-def test_sheets_connection():
-    from google_sheets import extract_sheet_id, get_client
-    from flask import jsonify
-    
-    sheets_url = app.config.get('GOOGLE_SHEETS_URL')
-    if not sheets_url:
-        return jsonify({'error': 'Google Sheets URL not configured'}), 400
-    
-    sheet_id = extract_sheet_id(sheets_url)
-    if not sheet_id:
-        return jsonify({'error': 'Invalid Google Sheets URL'}), 400
-    
-    try:
-        client = get_client()
-        sheet = client.open_by_key(sheet_id)
-        return jsonify({
-            'success': True,
-            'message': 'Connection successful',
-            'sheet_title': sheet.title,
-            'sheet_id': sheet_id
-        }), 200
-    except FileNotFoundError as e:
-        return jsonify({'error': str(e)}), 400
-    except Exception as e:
-        return jsonify({'error': str(e)}), 400
-
-@app.route('/api/questions/sync', methods=['POST'])
-@login_required
-def sync_questions():
-    """
-    Sincroniza questões da planilha Google Sheets com o banco de dados.
-    Adiciona apenas questões novas.
-    """
-    from google_sheets import sync_questions_from_sheets
-    
-    try:
-        result = sync_questions_from_sheets()
-        
-        if result.get('success'):
-            return jsonify(result), 200
-        else:
-            return jsonify(result), 400
-            
-    except Exception as e:
-        app.logger.error(f'Error in sync_questions endpoint: {str(e)}', exc_info=True)
-        return jsonify({'success': False, 'error': str(e)}), 500
-
-@app.route('/api/questions/read-sheet', methods=['GET'])
-@login_required
-def read_questions_from_sheet():
-    """
-    Lê questões da planilha Google Sheets sem adicionar ao banco.
-    Útil para debug e verificação.
-    """
-    from google_sheets import read_questions_from_sheets
-    
-    try:
-        result = read_questions_from_sheets()
-        return jsonify(result), 200 if result.get('success') else 400
-        
-    except Exception as e:
-        app.logger.error(f'Error in read_questions_from_sheet endpoint: {str(e)}', exc_info=True)
-        return jsonify({'success': False, 'error': str(e)}), 500
-
-@app.route('/api/questions/auto-sync-status', methods=['GET'])
-def get_auto_sync_status():
-    """
-    Retorna o status da sincronização automática de questões.
-    """
-    sheets_url = app.config.get('GOOGLE_SHEETS_URL')
-    sync_interval = int(os.getenv('QUESTIONS_SYNC_INTERVAL', '900'))  # Padrão: 15 minutos
-    
-    # Verificar se há threads de sincronização ativas
-    sync_threads = [t for t in threading.enumerate() if 'AutoSync' in t.name]
-    is_running = len(sync_threads) > 0
-    
-    return jsonify({
-        'enabled': bool(sheets_url),
-        'running': is_running,
-        'sync_interval_seconds': sync_interval,
-        'sync_interval_minutes': sync_interval / 60,
-        'sheets_configured': bool(sheets_url),
-        'message': 'Auto-sync is running' if (is_running and sheets_url) else 'Auto-sync is disabled or not configured'
-    }), 200
-
-@app.route('/api/audio/proxy', methods=['GET'])
-def proxy_audio():
-    """
-    Proxy para servir áudio do Google Drive, evitando problemas de CORS.
-    Recebe o file_id como parâmetro e retorna o stream do áudio.
-    """
-    file_id = request.args.get('id')
-    
-    if not file_id:
-        return jsonify({'error': 'File ID is required'}), 400
-    
-    # Construir URL do Google Drive
-    drive_url = f'https://drive.google.com/uc?export=download&id={file_id}'
-    
-    try:
-        # Fazer requisição para o Google Drive com stream=True para não carregar tudo na memória
-        response = requests.get(
-            drive_url,
-            stream=True,
-            timeout=30,
-            allow_redirects=True,
-            headers={
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-            }
-        )
-        
-        # Verificar se a requisição foi bem-sucedida
-        if response.status_code != 200:
-            app.logger.error(f'[AUDIO-PROXY] Failed to fetch audio from Google Drive. Status: {response.status_code}')
-            return jsonify({'error': f'Failed to fetch audio. Status: {response.status_code}'}), response.status_code
-        
-        # Obter content-type do arquivo
-        content_type = response.headers.get('Content-Type', 'audio/mpeg')
-        
-        # Se o Google Drive retornar HTML (página de aviso), tentar extrair o link direto
-        if 'text/html' in content_type:
-            # Tentar usar o formato alternativo
-            drive_url_alt = f'https://drive.google.com/uc?export=download&id={file_id}&confirm=t'
-            response = requests.get(
-                drive_url_alt,
-                stream=True,
-                timeout=30,
-                allow_redirects=True,
-                headers={
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-                }
-            )
-            content_type = response.headers.get('Content-Type', 'audio/mpeg')
-        
-        # Criar resposta streaming
-        def generate():
-            try:
-                for chunk in response.iter_content(chunk_size=8192):
-                    if chunk:
-                        yield chunk
-            except Exception as e:
-                app.logger.error(f'[AUDIO-PROXY] Error streaming audio: {str(e)}')
-        
-        # Retornar resposta com headers apropriados
-        return Response(
-            stream_with_context(generate()),
-            mimetype=content_type,
-            headers={
-                'Content-Type': content_type,
-                'Accept-Ranges': 'bytes',
-                'Cache-Control': 'public, max-age=3600',
-                'Access-Control-Allow-Origin': 'http://localhost:5173',
-                'Access-Control-Allow-Methods': 'GET',
-                'Access-Control-Allow-Headers': 'Content-Type'
-            }
-        )
-        
-    except requests.exceptions.Timeout:
-        app.logger.error('[AUDIO-PROXY] Timeout while fetching audio from Google Drive')
-        return jsonify({'error': 'Timeout while fetching audio'}), 504
-    except requests.exceptions.RequestException as e:
-        app.logger.error(f'[AUDIO-PROXY] Error fetching audio from Google Drive: {str(e)}')
-        return jsonify({'error': f'Error fetching audio: {str(e)}'}), 500
-    except Exception as e:
-        app.logger.error(f'[AUDIO-PROXY] Unexpected error: {str(e)}', exc_info=True)
-        return jsonify({'error': 'Unexpected error'}), 500
-
-# ============================================================================
-# Sincronização Automática de Questões
-# ============================================================================
-
-def auto_sync_questions_worker():
-    """
-    Worker thread que sincroniza questões automaticamente em intervalos regulares.
-    Verifica a planilha Google Sheets e adiciona novas questões ao banco de dados.
-    """
-    # Intervalo de sincronização em segundos (padrão: 15 minutos = 900 segundos)
-    # Aumentado para evitar rate limiting (limite: 60 requisições/minuto)
-    sync_interval = int(os.getenv('QUESTIONS_SYNC_INTERVAL', '900'))
-    
-    app.logger.info(f'[AUTO-SYNC] Starting automatic questions sync worker (interval: {sync_interval}s = {sync_interval/60:.1f}min)')
-    
-    while True:
-        try:
-            # Criar contexto da aplicação para esta thread
-            with app.app_context():
-                from google_sheets import sync_questions_from_sheets
-                
-                app.logger.info('[AUTO-SYNC] Starting automatic sync check...')
-                
-                try:
-                    result = sync_questions_from_sheets()
-                    
-                    if result.get('success'):
-                        added = result.get('added', 0)
-                        skipped = result.get('skipped', 0)
-                        removed = result.get('removed', 0)
-                        
-                        if added > 0 or removed > 0:
-                            app.logger.info(f'[AUTO-SYNC] ✓ Sync completed: {added} added, {skipped} skipped, {removed} removed')
-                        else:
-                            app.logger.debug(f'[AUTO-SYNC] No changes ({skipped} already exist)')
-                    else:
-                        error = result.get('error', 'Unknown error')
-                        # Se for rate limit, aumentar o intervalo temporariamente
-                        if '429' in str(error) or 'RATE_LIMIT' in str(error) or 'Quota exceeded' in str(error):
-                            extended_wait = sync_interval * 3  # Aguardar 3x o intervalo normal
-                            app.logger.warning(f'[AUTO-SYNC] Rate limit atingido. Próxima sincronização em {extended_wait}s ({extended_wait/60:.1f}min)')
-                            time.sleep(extended_wait)
-                            continue
-                        else:
-                            app.logger.warning(f'[AUTO-SYNC] Sync failed: {error}')
-                        
-                except Exception as e:
-                    app.logger.error(f'[AUTO-SYNC] Error during sync: {str(e)}', exc_info=True)
-                
-                # Aguardar antes da próxima verificação
-                app.logger.debug(f'[AUTO-SYNC] Waiting {sync_interval}s before next sync check...')
-                time.sleep(sync_interval)
-                
-        except Exception as e:
-            app.logger.error(f'[AUTO-SYNC] Fatal error in sync worker: {str(e)}', exc_info=True)
-            # Em caso de erro fatal, aguardar antes de tentar novamente
-            time.sleep(sync_interval)
-
-def start_auto_sync():
-    """
-    Inicia a thread de sincronização automática.
-    Esta função deve ser chamada quando a aplicação Flask inicia.
-    """
-    try:
-        # Verificar se a URL do Google Sheets está configurada
-        sheets_url = app.config.get('GOOGLE_SHEETS_URL')
-        if not sheets_url:
-            app.logger.warning('[AUTO-SYNC] Google Sheets URL not configured. Auto-sync disabled.')
-            return
-        
-        # Fazer uma sincronização imediata ao iniciar
-        def initial_sync():
-            try:
-                with app.app_context():
-                    from google_sheets import sync_questions_from_sheets
-                    app.logger.info('[AUTO-SYNC] Performing initial sync on startup...')
-                    result = sync_questions_from_sheets()
-                    if result.get('success'):
-                        added = result.get('added', 0)
-                        app.logger.info(f'[AUTO-SYNC] ✓ Initial sync completed: {added} new question(s) added')
-                    else:
-                        app.logger.warning(f'[AUTO-SYNC] Initial sync failed: {result.get("error")}')
-            except Exception as e:
-                app.logger.error(f'[AUTO-SYNC] Error in initial sync: {str(e)}', exc_info=True)
-        
-        # Executar sincronização inicial em thread separada
-        initial_thread = threading.Thread(target=initial_sync, daemon=True, name='InitialSync')
-        initial_thread.start()
-        
-        # Iniciar thread de sincronização automática periódica
-        sync_thread = threading.Thread(target=auto_sync_questions_worker, daemon=True, name='AutoSyncQuestions')
-        sync_thread.start()
-        app.logger.info('[AUTO-SYNC] ✓ Automatic questions sync started successfully')
-        
-    except Exception as e:
-        app.logger.error(f'[AUTO-SYNC] Failed to start auto-sync: {str(e)}', exc_info=True)
-
-# Flag para controlar se a sincronização automática já foi iniciada
-_auto_sync_started = False
-
-# Iniciar sincronização automática quando o módulo é importado
-# Isso garante que a sincronização comece mesmo quando o app roda com gunicorn/uwsgi
-def init_auto_sync():
-    """Inicializa a sincronização automática com delay para garantir que o app está pronto"""
-    global _auto_sync_started
-    
-    if _auto_sync_started:
-        return
-    
-    def delayed_start():
-        # Aguardar alguns segundos para garantir que o app está totalmente inicializado
-        time.sleep(3)
-        try:
-            start_auto_sync()
-            _auto_sync_started = True
-        except Exception as e:
-            app.logger.warning(f'[AUTO-SYNC] Could not start auto-sync: {str(e)}')
-    
-    try:
-        init_thread = threading.Thread(target=delayed_start, daemon=True, name='AutoSyncInit')
-        init_thread.start()
-    except Exception as e:
-        app.logger.warning(f'[AUTO-SYNC] Could not start auto-sync thread: {str(e)}')
-
-# Iniciar em uma thread separada para não bloquear
-init_auto_sync()
-
-if __name__ == '__main__':
-    import logging
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-    )
-    
-    with app.app_context():
-        db.create_all()
-        # Garantir que a sincronização automática seja iniciada quando rodar diretamente
-        if not _auto_sync_started:
-            time.sleep(1)  # Pequeno delay para garantir que tudo está inicializado
-            start_auto_sync()
-    
-    app.logger.info('Starting Flask application...')
-    # Usar debug apenas se FLASK_DEBUG estiver ativado
-    debug_mode = app.config.get('FLASK_DEBUG', False)
-    app.run(debug=debug_mode, host='0.0.0.0', port=5000)
-
-# --- ROTAS DE RECUPERAÇÃO DE SENHA ---
-import os
-import secrets
-import smtplib
-from datetime import datetime, timedelta
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-from werkzeug.security import generate_password_hash
-from flask import request, jsonify
 
 @app.route('/api/auth/forgot-password', methods=['POST'])
 def forgot_password():
-    data = request.get_json()
+    data = request.get_json() or {}
     email = data.get('email')
-    
+
     if not email:
         return jsonify({'message': 'E-mail é obrigatório'}), 400
-        
-    user = User.query.filter_by(email=email).first()
-    if not user:
+
+    gamer = Gamer.query.filter_by(email=email).first()
+    if not gamer:
         return jsonify({'message': 'Se o e-mail estiver cadastrado, você receberá um link de recuperação.'}), 200
-        
+
     token = secrets.token_urlsafe(32)
-    user.reset_token = token
-    user.reset_token_expiry = datetime.now() + timedelta(hours=1)
+    gamer.reset_token = token
+    gamer.reset_token_expiry = datetime.utcnow() + timedelta(hours=1)
     db.session.commit()
-    
+
     sender_email = "play@provapop.com.br"
-    sender_password = os.getenv("ZOHO_APP_PASSWORD") # Lendo do arquivo .env com segurança!
-    
+    sender_password = os.getenv("ZOHO_APP_PASSWORD")
+
     if not sender_password:
-        print("ERRO GRAVE: Senha ZOHO_APP_PASSWORD não encontrada no .env!")
         return jsonify({'message': 'Erro interno do servidor. Contate o suporte.'}), 500
-    
+
     msg = MIMEMultipart('alternative')
     msg['Subject'] = "Recuperação de Senha - ProvaPop!"
     msg['From'] = f"ProvaPop! <{sender_email}>"
     msg['To'] = email
-    
+
     reset_link = f"https://play.provapop.com.br/nova-senha?token={token}"
-    
+
     html_content = f"""
     <html>
       <body style="font-family: Arial, sans-serif; color: #333;">
         <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
-            <h2>Olá, {user.nickname}! 🎮</h2>
+            <h2>Olá, {gamer.nome}! 🎮</h2>
             <p>Recebemos um pedido para redefinir a senha da sua conta no <strong>ProvaPop!</strong>.</p>
             <p>Para criar uma nova senha, clique no botão abaixo (este link expira em 1 hora):</p>
             <a href="{reset_link}" style="display: inline-block; padding: 10px 20px; background-color: #4CAF50; color: white; text-decoration: none; border-radius: 5px; font-weight: bold;">Redefinir Minha Senha</a>
-            <p style="margin-top: 30px; font-size: 12px; color: #777;">Se você não solicitou esta alteração, pode ignorar este e-mail tranquilamente. Sua senha atual continuará funcionando.</p>
-            <hr style="border: none; border-top: 1px solid #eee; margin-top: 30px;">
-            <p style="font-size: 12px; color: #aaa;">Equipe ProvaPop!</p>
+            <p style="margin-top: 30px; font-size: 12px; color: #777;">Se você não solicitou esta alteração, pode ignorar este e-mail tranquilamente.</p>
         </div>
       </body>
     </html>
     """
     msg.attach(MIMEText(html_content, 'html'))
-    
+
     try:
         with smtplib.SMTP_SSL("smtp.zoho.com", 465) as server:
             server.login(sender_email, sender_password)
             server.sendmail(sender_email, email, msg.as_string())
-            
-    except Exception as e:
-        print(f"Erro ao enviar e-mail: {e}")
+    except Exception:
         return jsonify({'message': 'Erro ao tentar enviar o e-mail. Tente novamente mais tarde.'}), 500
-        
+
     return jsonify({'message': 'Se o e-mail estiver cadastrado, você receberá um link de recuperação.'}), 200
+
 
 @app.route('/api/auth/reset-password', methods=['POST'])
 def reset_password():
-    data = request.get_json()
+    data = request.get_json() or {}
     token = data.get('token')
     new_password = data.get('new_password')
-    
+
     if not token or not new_password:
         return jsonify({'message': 'Token e nova senha são obrigatórios'}), 400
-        
-    user = User.query.filter_by(reset_token=token).first()
-    
-    if not user or not user.reset_token_expiry or user.reset_token_expiry < datetime.now():
+
+    gamer = Gamer.query.filter_by(reset_token=token).first()
+
+    if not gamer or not gamer.reset_token_expiry or gamer.reset_token_expiry < datetime.utcnow():
         return jsonify({'message': 'Link inválido ou expirado. Por favor, solicite a recuperação novamente.'}), 400
-        
-    user.password_hash = generate_password_hash(new_password)
-    user.reset_token = None
-    user.reset_token_expiry = None
+
+    gamer.password_hash = generate_password_hash(new_password)
+    gamer.reset_token = None
+    gamer.reset_token_expiry = None
     db.session.commit()
-    
+
     return jsonify({'message': 'Senha redefinida com sucesso! Você já pode voltar a jogar.'}), 200
+
+
+@app.route('/api/questoes-do-dia', methods=['GET'])
+@optional_auth
+def get_questoes_do_dia():
+    debug_auth_context("QUESTOES_DO_DIA_ROUTE_ENTERED")
+
+    try:
+        hoje = get_brazil_today()
+        gamer = request.current_user if hasattr(request, 'current_user') else None
+
+        def format_questions(questoes):
+            return [serialize_question_with_user_context(q, gamer) for q in questoes]
+
+        questoes_hoje = Questao.query.filter_by(data_exibicao=hoje, ativo=True).all()
+
+        if questoes_hoje and len(questoes_hoje) >= 4:
+            partida_id = None
+            if gamer:
+                partida = get_or_create_daily_partida(gamer.id, origem='questoes_do_dia_oficial')
+                partida_id = partida.id
+
+            return jsonify({
+                "status": "sucesso",
+                "data": str(hoje),
+                "modo": "oficial",
+                "partida_id": partida_id,
+                "questoes": format_questions(questoes_hoje)
+            }), 200
+
+        questoes_ineditas = Questao.query.filter(
+            Questao.data_exibicao.is_(None),
+            Questao.ativo.is_(True)
+        ).limit(4).all()
+
+        if questoes_ineditas and len(questoes_ineditas) >= 4:
+            for q in questoes_ineditas:
+                q.data_exibicao = hoje
+            db.session.commit()
+
+            partida_id = None
+            if gamer:
+                partida = get_or_create_daily_partida(gamer.id, origem='questoes_do_dia_piloto')
+                partida_id = partida.id
+
+            return jsonify({
+                "status": "sucesso",
+                "data": str(hoje),
+                "modo": "piloto-automatico",
+                "partida_id": partida_id,
+                "questoes": format_questions(questoes_ineditas)
+            }), 200
+
+        questoes_antigas = Questao.query.filter(
+            Questao.data_exibicao.is_not(None),
+            Questao.data_exibicao != hoje,
+            Questao.ativo.is_(True)
+        ).all()
+
+        if questoes_antigas and len(questoes_antigas) >= 4:
+            questoes_flashback = random.sample(questoes_antigas, 4)
+
+            partida_id = None
+            if gamer:
+                partida = get_or_create_daily_partida(gamer.id, origem='questoes_do_dia_flashback')
+                partida_id = partida.id
+
+            return jsonify({
+                "status": "sucesso",
+                "data": str(hoje),
+                "modo": "flashback",
+                "partida_id": partida_id,
+                "questoes": format_questions(questoes_flashback)
+            }), 200
+
+        return jsonify({
+            "status": "vazio",
+            "mensagem": "Sem questões suficientes. Aguardando o Diretor!"
+        }), 200
+
+    except Exception as e:
+        erro_detalhado = traceback.format_exc()
+        app.logger.error(f'Erro ao buscar questoes do dia: {erro_detalhado}')
+        return jsonify({
+            "erro_critico": str(e),
+            "dica": "Olhe o detalhe abaixo para saber a linha do erro",
+            "erro_detalhado": erro_detalhado
+        }), 500
+
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000, debug=True)

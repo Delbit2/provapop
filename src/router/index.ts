@@ -90,7 +90,7 @@ const router = createRouter({
     {
       path: '/jornada',
       name: 'jornada',
-      component: () => import('@/views/Jornada.vue'),
+      component: () => import('@/views/jornada.vue'),
       meta: { requiresAuth: true },
     },
     {

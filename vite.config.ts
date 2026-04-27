@@ -5,13 +5,22 @@ import { fileURLToPath, URL } from 'node:url'
 
 export default defineConfig({
   base: '/', // <--- Alterado para a raiz
-  // build: { outDir: 'docs' } foi removido para usar o padrão 'dist'
+  
+  // 👇 ADICIONADO: Aumenta o limite de aviso do Vite (tira o aviso amarelo do console)
+  build: {
+    chunkSizeWarningLimit: 5000, 
+  },
+  
   plugins: [
     vue(),
     VitePWA({
       registerType: 'autoUpdate',
       devOptions: {
         enabled: true
+      },
+      // 👇 ADICIONADO: Diz ao PWA para aceitar arquivos de até 5MB no cache offline
+      workbox: {
+        maximumFileSizeToCacheInBytes: 5000000 
       },
       manifest: {
         id: '/', // <--- Alterado para a raiz

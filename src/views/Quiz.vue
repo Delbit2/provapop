@@ -255,8 +255,6 @@
 
 <script setup lang="ts">
 // @ts-nocheck
-import { ref, computed, onMounted } from 'vue'
-// ... resto do código continua normal
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import confetti from 'canvas-confetti'

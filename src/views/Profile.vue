@@ -180,8 +180,6 @@
 <script setup lang="ts">
 // @ts-nocheck
 import { ref, computed, onMounted } from 'vue'
-// ... resto do código continua normal
-import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import Card from '@/components/Card.vue'
 import { useAuthStore } from '@/stores/auth'

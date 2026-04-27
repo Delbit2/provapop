@@ -71,7 +71,7 @@
           <div class="action-card__content">
             <span class="badge-available">JÁ DISPONÍVEL</span>
             <h3>Alcance sua maior nota!</h3>
-            <p>E-book esclusivo ProvaPop!</p>
+            <p>E-book exclusivo ProvaPop!</p>
           </div>
           <button @click="router.push('/ebook')" class="btn-action btn-action--ebook">
             Garantir 🚀
@@ -98,8 +98,6 @@
 
 <script setup lang="ts">
 // @ts-nocheck
-import { ref, computed, onMounted } from 'vue'
-// ... resto do código continua normal
 import { computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
@@ -144,7 +142,6 @@ const userAccuracy = computed(() => {
   if (totalQuizzes.value === 0) return 0 
   return Math.round((correctAnswers.value / totalQuizzes.value) * 100)
 })
-
 </script>
 
 <style scoped>
